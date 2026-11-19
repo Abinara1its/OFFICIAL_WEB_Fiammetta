@@ -1,0 +1,1037 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Fiammetta, a quadruped whose foot forces come from a learned policy: the thesis told through its onboard controller, running live in the browser.">
+<style>[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
+<title>Fiammetta</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Schibsted+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a reading column beside a live stage. The stage can open into a full-screen open world,
+   the Proving Grounds, where the thesis is walked rather than read. */
+:root{
+  --paper:#eef0ec; --ink:#1a1e22; --ink-2:#555d64; --ink-3:#848b91; --rule:#d3d7d0;
+  --flame:#e0531f; --b:#1d7c8c; --ok:#2e7d4c; --warn:#b67818; --bad:#b52a31; --gold:#b58a2a;
+  --stage-top:#dfe3e2; --stage-bot:#c6ccca; --chip:#f8f9f6;
+  --f-text:"Newsreader",Georgia,"Times New Roman",serif;
+  --f-ui:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#14171a; --ink:#e6e7e3; --ink-2:#a9afb4; --ink-3:#7c8389; --rule:#2c3237;
+  --flame:#ff7240; --b:#52b9c8; --ok:#5cc17f; --warn:#e3a649; --bad:#f06b70; --gold:#e0b856;
+  --stage-top:#21272b; --stage-bot:#171b1e; --chip:#1d2226; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#14171a; --ink:#e6e7e3; --ink-2:#a9afb4; --ink-3:#7c8389; --rule:#2c3237;
+  --flame:#ff7240; --b:#52b9c8; --ok:#5cc17f; --warn:#e3a649; --bad:#f06b70; --gold:#e0b856;
+  --stage-top:#21272b; --stage-bot:#171b1e; --chip:#1d2226; color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font:19px/1.6 var(--f-text)}
+body.inworld{overflow:hidden}
+.page{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr)}
+.read{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:40px;padding-block:28px 120px;min-width:0}
+.read > *{max-width:520px;margin-left:auto}
+.stagecol{position:relative;padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0}
+.stage{position:sticky;top:max(12px,env(safe-area-inset-top,0px));height:calc(100vh - 24px);margin-block:12px;border-radius:14px;overflow:hidden;background:linear-gradient(var(--stage-top),var(--stage-bot));isolation:isolate}
+.stage.world{position:fixed;inset:0;height:auto;margin:0;border-radius:0;z-index:60}
+.stage canvas.gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+h1,h2,h3{font-family:var(--f-ui)}
+h1{font-size:3.4rem;line-height:.95;font-weight:800;letter-spacing:-.035em;margin:0 0 18px;text-wrap:balance}
+h2{font-size:1.55rem;line-height:1.15;font-weight:700;letter-spacing:-.015em;margin:0 0 14px;text-wrap:balance}
+p{margin:0 0 16px}
+.kicker{font:600 .78rem/1 var(--f-ui);color:var(--flame);letter-spacing:.02em;margin:0 0 10px;display:block}
+.chapter{padding-top:92px}
+.chapter:first-of-type{padding-top:20px}
+.lead{font-size:1.2rem;line-height:1.5}
+.note{font:400 .86rem/1.5 var(--f-ui);color:var(--ink-2);border-left:2px solid var(--rule);padding:2px 0 2px 12px;margin:0 0 18px}
+.note b{color:var(--ink);font-weight:600}
+.num{font-family:var(--f-mono);font-size:.88em;font-variant-numeric:tabular-nums}
+.go{display:inline-flex;gap:8px;align-items:center;font:600 .9rem/1 var(--f-ui);color:var(--ink);background:transparent;border:1.5px solid var(--ink);border-radius:999px;padding:9px 15px;cursor:pointer;margin:4px 0 18px}
+.go::after{content:"→";transition:transform .15s}
+.go:hover::after{transform:translateX(3px)}
+.go.on{background:var(--ink);color:var(--paper)}
+.door{display:grid;gap:8px;border:1.5px solid var(--ink);border-radius:14px;padding:16px 18px;margin:6px 0 22px;cursor:pointer;background:transparent;text-align:left;color:var(--ink);width:100%}
+.door b{font:800 1.15rem/1.1 var(--f-ui);letter-spacing:-.01em}
+.door span{font:400 .88rem/1.45 var(--f-ui);color:var(--ink-2)}
+.door:hover{background:color-mix(in srgb,var(--flame) 8%,transparent)}
+:focus-visible{outline:2px solid var(--flame);outline-offset:2px}
+figure{margin:8px 0 26px}
+figure svg{width:100%;height:auto;display:block}
+figcaption{font:400 .82rem/1.45 var(--f-ui);color:var(--ink-2);margin-top:8px}
+figcaption b{color:var(--ink)}
+svg text{font-family:var(--f-ui)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.pills button{font:500 .8rem/1 var(--f-ui);padding:7px 11px;border-radius:999px;border:1px solid var(--rule);background:transparent;color:var(--ink);cursor:pointer}
+.pills button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+ul.plain{padding-left:1.1em;margin:0 0 16px}
+ul.plain li{margin-bottom:6px}
+.sig{font:400 .84rem/1.5 var(--f-ui);color:var(--ink-3);margin-top:60px;border-top:1px solid var(--rule);padding-top:16px}
+
+/* Stage overlay, shared by both modes */
+.ov{position:absolute;font:500 .78rem/1.2 var(--f-ui);color:var(--ink)}
+.chip{background:color-mix(in srgb,var(--chip) 90%,transparent);border:1px solid var(--rule);border-radius:999px;padding:6px 11px;backdrop-filter:blur(6px);display:inline-flex;gap:7px;align-items:center;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ink-3);display:inline-block;flex:none}
+.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.tl{left:max(14px,env(safe-area-inset-left,0px));top:max(14px,env(safe-area-inset-top,0px));display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 300px)}
+.tr{right:max(14px,env(safe-area-inset-right,0px));top:max(14px,env(safe-area-inset-top,0px));display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:60%}
+.bl{left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));display:flex;gap:12px;align-items:flex-end}
+.br{right:max(14px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));display:grid;gap:8px;justify-items:end}
+.sbtn{font:600 .78rem/1 var(--f-ui);background:color-mix(in srgb,var(--chip) 92%,transparent);color:var(--ink);border:1px solid var(--rule);border-radius:999px;padding:9px 12px;cursor:pointer;backdrop-filter:blur(6px);min-height:34px}
+.sbtn[aria-pressed="true"],.sbtn[aria-expanded="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.sbtn.hot{background:var(--flame);border-color:var(--flame);color:#fff}
+.sbtn:disabled{opacity:.45;cursor:default}
+.joy{width:118px;height:118px;border-radius:50%;background:color-mix(in srgb,var(--chip) 75%,transparent);border:1px solid var(--rule);position:relative;touch-action:none;cursor:grab;backdrop-filter:blur(6px);flex:none}
+.joy::before{content:"";position:absolute;left:50%;top:8px;bottom:8px;width:1px;background:var(--rule)}
+.joy::after{content:"";position:absolute;top:50%;left:8px;right:8px;height:1px;background:var(--rule)}
+.knob{position:absolute;width:38px;height:38px;border-radius:50%;background:var(--flame);left:calc(50% - 19px);top:calc(50% - 19px);box-shadow:0 2px 8px rgb(0 0 0 / .25);z-index:1;pointer-events:none}
+.joylab{display:grid;gap:4px;font:500 .74rem/1.3 var(--f-mono);color:var(--ink-2)}
+.joylab b{font-family:var(--f-ui);color:var(--ink);font-size:.78rem}
+.panel{position:absolute;right:max(14px,env(safe-area-inset-right,0px));top:60px;width:300px;max-width:calc(100% - 28px);max-height:calc(100% - 150px);overflow:auto;background:var(--chip);border:1px solid var(--rule);border-radius:12px;padding:14px;display:grid;gap:10px;align-content:start;font:400 .82rem/1.4 var(--f-ui);box-shadow:0 8px 30px rgb(0 0 0 / .15);z-index:8}
+.panel h4{margin:0;font:700 .9rem/1.1 var(--f-ui);display:flex;justify-content:space-between;align-items:center}
+.panel h4 button{all:unset;cursor:pointer;font-size:1.1rem;color:var(--ink-2);padding:0 4px}
+.panel canvas{width:100%;aspect-ratio:1;border-radius:6px;cursor:pointer;display:block}
+.list{display:grid;gap:2px}
+.list button{all:unset;cursor:pointer;padding:8px 10px;border-radius:8px;display:grid;gap:2px}
+.list button:hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.list button:focus-visible{outline:2px solid var(--flame)}
+.list button[aria-pressed="true"]{background:color-mix(in srgb,var(--flame) 16%,transparent)}
+.list button[aria-disabled="true"]{opacity:.45;cursor:default}
+.list b{font-weight:600}
+.list span{color:var(--ink-2);font-size:.76rem}
+.slot{font-weight:600;margin-top:6px;display:flex;gap:6px;align-items:center}
+.tally{position:absolute;left:max(14px,env(safe-area-inset-left,0px));top:56px;display:grid;gap:6px;font:500 .76rem/1.3 var(--f-ui);max-width:calc(100% - 28px);pointer-events:none}
+.tally .row{display:grid;grid-template-columns:12px auto;gap:8px;align-items:start;background:color-mix(in srgb,var(--chip) 90%,transparent);border:1px solid var(--rule);border-radius:10px;padding:8px 11px;backdrop-filter:blur(6px)}
+.tally .sw{width:10px;height:10px;border-radius:3px;margin-top:3px}
+.tally .vals{font-family:var(--f-mono);color:var(--ink-2);font-size:.7rem}
+.label3d{position:absolute;transform:translate(-50%,-100%);font:600 .74rem/1 var(--f-ui);padding:5px 8px;border-radius:999px;color:#fff;pointer-events:none;white-space:nowrap}
+.label3d.beacon{background:color-mix(in srgb,var(--ink) 80%,transparent);font-weight:500}
+.label3d.beacon.goal{background:var(--gold)}
+.strip{position:absolute;left:150px;right:200px;bottom:14px;height:70px;pointer-events:none}
+.poster{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;text-align:center;gap:14px;padding:24px;z-index:20;background:radial-gradient(ellipse at 50% 70%,var(--stage-top),var(--stage-bot))}
+.poster p{font:400 .9rem/1.5 var(--f-ui);color:var(--ink-2);max-width:40ch;margin:0}
+.wake{font:700 1rem/1 var(--f-ui);background:var(--flame);color:#fff;border:0;border-radius:999px;padding:14px 22px;cursor:pointer}
+.wake:disabled{opacity:.6;cursor:default}
+.prog{width:220px;height:3px;background:var(--rule);border-radius:2px;overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--flame);transition:width .2s}
+.toast{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--chip);border:1px solid var(--rule);border-radius:14px;padding:18px 20px;display:grid;gap:10px;justify-items:center;text-align:center;font:400 .9rem/1.45 var(--f-ui);width:min(340px,calc(100% - 32px));z-index:12;box-shadow:0 10px 40px rgb(0 0 0 / .22)}
+.toast h3{margin:0;font:800 1.1rem/1.15 var(--f-ui)}
+.toast .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.hint{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);font:600 .8rem/1.2 var(--f-ui);color:var(--ink);pointer-events:none;text-align:center;background:color-mix(in srgb,var(--chip) 85%,transparent);padding:7px 12px;border-radius:999px;max-width:80%}
+
+/* Open world HUD */
+.quest{position:absolute;left:max(14px,env(safe-area-inset-left,0px));top:max(14px,env(safe-area-inset-top,0px));width:min(330px,calc(100% - 28px));background:color-mix(in srgb,var(--chip) 92%,transparent);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;backdrop-filter:blur(8px);font:400 .82rem/1.4 var(--f-ui);display:grid;gap:6px;z-index:3}
+.quest .qk{font:600 .7rem/1 var(--f-ui);color:var(--gold);letter-spacing:.04em}
+.quest b{font:700 .98rem/1.2 var(--f-ui)}
+.quest .qd{color:var(--ink-2)}
+.quest .qp{font-family:var(--f-mono);font-size:.72rem;color:var(--ink-2)}
+.sheet{position:absolute;right:max(14px,env(safe-area-inset-right,0px));top:62px;width:220px;background:color-mix(in srgb,var(--chip) 92%,transparent);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;backdrop-filter:blur(8px);font:500 .74rem/1.3 var(--f-ui);display:grid;gap:8px;z-index:3}
+.sheet .r{display:grid;gap:3px}
+.sheet .r div{display:flex;justify-content:space-between;gap:8px}
+.sheet .r span{color:var(--ink-2)}
+.sheet .r em{font-style:normal;font-family:var(--f-mono)}
+.gauge{height:6px;border-radius:3px;background:var(--rule);position:relative;overflow:hidden}
+.gauge i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--ok)}
+.gauge::after{content:"";position:absolute;top:0;bottom:0;left:33.3%;width:1px;background:var(--ink-2)}
+.banner{position:absolute;left:50%;top:22%;transform:translateX(-50%);text-align:center;pointer-events:none;z-index:9;font-family:var(--f-ui);transition:opacity .5s}
+.banner small{display:block;font:600 .75rem/1 var(--f-ui);color:var(--gold);letter-spacing:.08em;margin-bottom:6px}
+.banner b{font:800 1.7rem/1.05 var(--f-ui);letter-spacing:-.02em;color:var(--ink);text-shadow:0 1px 0 var(--chip)}
+.journal{display:grid;gap:12px}
+.journal article{display:grid;gap:4px;border-top:1px solid var(--rule);padding-top:10px}
+.journal article b{font:700 .9rem/1.2 var(--f-ui)}
+.journal article p{margin:0;font:400 .92rem/1.5 var(--f-text);color:var(--ink)}
+.journal .locked{color:var(--ink-3);font-style:italic}
+
+.turn{width:150px;height:40px;border-radius:999px;background:color-mix(in srgb,var(--chip) 75%,transparent);border:1px solid var(--rule);position:relative;touch-action:none;cursor:ew-resize;backdrop-filter:blur(6px)}
+.turn span{position:absolute;inset:0;display:grid;place-items:center;font:500 .7rem/1 var(--f-ui);color:var(--ink-3);pointer-events:none}
+.tknob{position:absolute;top:5px;left:calc(50% - 15px);width:30px;height:28px;border-radius:999px;background:var(--ink);z-index:1;pointer-events:none}
+.field{display:grid;grid-template-columns:76px 1fr 44px;gap:8px;align-items:center}
+.field span{display:flex;gap:6px;grid-column:2/4}
+.field input[type=number]{width:100%;font:inherit;padding:6px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink)}
+.field output{font-family:var(--f-mono);font-size:.72rem;text-align:right}
+.warnbox{margin:0;color:var(--warn);font-size:.78rem}
+.gen{position:absolute;inset:0;z-index:15;display:grid;place-content:center;justify-items:center;gap:10px;background:rgb(18 24 22 / .55);color:#fff;font:400 .85rem/1.4 var(--f-ui);backdrop-filter:blur(3px)}
+.gen b{font:800 1.3rem/1 var(--f-ui)}
+.gen .prog{background:rgb(255 255 255 / .25)}
+.placebar{position:absolute;left:50%;top:64px;transform:translateX(-50%);z-index:9;display:grid;gap:8px;justify-items:center;text-align:center;width:min(380px,calc(100% - 28px));background:color-mix(in srgb,var(--chip) 94%,transparent);border:1px solid var(--rule);border-radius:12px;padding:10px 12px;font:500 .8rem/1.35 var(--f-ui);backdrop-filter:blur(8px)}
+.placebar .btns{display:flex;gap:6px}
+.stage.placing canvas.gl{cursor:crosshair}
+.fsm .n rect{fill:var(--paper);stroke:var(--rule);stroke-width:1.5}
+.fsm .n text{fill:var(--ink);font-size:13px;font-weight:600}
+.fsm .n.live rect{fill:var(--flame);stroke:var(--flame)}
+.fsm .n.live text{fill:#fff}
+.fsm path{fill:none;stroke:var(--ink-3);stroke-width:1.3}
+.stage:not(.world) [data-only="world"]{display:none!important}
+.stage.world [data-only="story"]{display:none!important}
+
+@media (max-width:980px){
+  .page{grid-template-columns:1fr}
+  .stagecol{order:-1;position:sticky;top:0;z-index:10;padding:0;height:58vh}
+  .stage{position:relative;top:0;height:58vh;margin:0;border-radius:0}
+  .read{padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .read > *{margin-left:0;max-width:640px}
+  h1{font-size:2.6rem}
+  body{font-size:18px}
+  .joy{width:96px;height:96px}.knob{width:34px;height:34px;left:calc(50% - 17px);top:calc(50% - 17px)}
+  .strip{display:none}
+  .tl{max-width:calc(100% - 28px)}
+  .stage.world .tr,.stage .tr{max-width:calc(100% - 28px)}
+  .stage:not(.world) #cScene{display:none}
+  .sbtn{padding:8px 10px;font-size:.74rem}
+  .tally{top:56px;bottom:auto;max-width:62%}
+  .tally .row{padding:6px 9px}
+  .panel{top:auto;bottom:124px;max-height:calc(100% - 190px)}
+  .hint{bottom:auto;top:56px}
+  .stage.world .placebar{top:auto;bottom:220px}
+  .joylab span:nth-child(3),.joylab span:nth-child(4){display:none}
+  .turn{width:120px}
+  .sheet{top:auto;bottom:168px;width:180px;padding:10px 12px}
+  .stage.world .sheet.collapsed .r:not(:first-child){display:none}
+  .quest{padding:10px 12px}
+  .stage.world .quest{top:calc(max(14px,env(safe-area-inset-top,0px)) + 46px)}
+  .banner b{font-size:1.3rem}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="page">
+<main class="read">
+
+<section class="chapter" id="c0">
+  <span class="kicker">A thesis in robot locomotion</span>
+  <h1>Fiammetta learns where to push</h1>
+  <p class="lead">This is a four-legged robot I wrote the walking software for. It walks with a classical controller, but the most delicate decision in that controller, how hard each foot presses on the ground, is made by a small neural network.</p>
+  <p>The robot beside this text is not a recording. It is the same control program that runs on the real robot, compiled for your browser, standing in the physics simulator I used to test it.</p>
+  <button class="door" id="enterWorld"><b>Enter the Proving Grounds</b><span>A valley generated for this visit: meadows, scree, a wood, a ridge with a stone stair and a steep grass face. Every rock and tree trunk is solid to the robot. Follow the quests to unlock its learned forces, meet the planner it replaced, and fill a journal with what the thesis found.</span></button>
+  <p>Or read on. Each chapter below sets the stage for what it describes.</p>
+  <button class="go" data-scene="intro">Walk it forward</button>
+  <p class="note"><b>How to drive.</b> The round stick moves the robot: up is forward, sideways is a sidestep. The bar beside it turns. Both stay where you leave them; double-tap either, or press space, to stop. Keys: W and S forward and back, A and D sidestep, Q and E or the arrow keys turn. A game controller works too. Drag the robot's body to shove it; drag anywhere else to look around, pinch or scroll to zoom. <b>Pick up</b> does what an operator would: lift the robot, carry it, and set it down where you tap, facing the way you drag.</p>
+</section>
+
+<section class="chapter" id="c1">
+  <span class="kicker">1 · The robot</span>
+  <h2>Twenty-six kilograms, twelve motors, no eyes</h2>
+  <p>Fiammetta Mk-II weighs 26.4 kg. Each leg has three joints: one swings the leg sideways at the hip, one swings the thigh, one bends the knee. Every joint has a RobStride RS03 motor that can produce 60 N·m for a moment but is rated for 20 N·m continuously.</p>
+  <p>It feels the world only through its own body: the angle and torque of each joint, and an inertial sensor in the trunk that measures rotation and acceleration. There is no camera and no laser scanner. When it climbs stairs, it finds each step with its feet.</p>
+  <p class="note">So the robot never knows its own speed directly. A filter estimates it from the legs and the inertial sensor, and the controller uses only that estimate. In the strip at the bottom of the stage, the <b>blue line</b> is the estimate and the <b>orange line</b> is the simulator's true speed, which the controller never sees.</p>
+  <button class="go" data-scene="stand">Let it stand still</button>
+</section>
+
+<section class="chapter" id="c2">
+  <span class="kicker">2 · The decision</span>
+  <h2>Every 2 ms, each foot on the ground has to push with some force</h2>
+  <p>The orange arrows at the feet are those forces. Shove the robot sideways and watch them lean against you. Together they decide whether the trunk stays level, keeps its height, and moves at the speed you asked for.</p>
+  <p>They cannot point anywhere. A foot that pushes too far sideways slips, so each force has to stay inside a cone set by friction, and the motors have limits of their own. When an arrow turns amber, the controller has run out of grip and is pulling the force back into the cone.</p>
+  <p class="note">The bars beside the speed line show which feet are scheduled to be down (pale) and which ones the controller believes are touching the ground (dark). In a trot, the diagonal pairs alternate.</p>
+  <button class="go" data-scene="push">Stand it up and shove it</button>
+</section>
+
+<section class="chapter" id="c3">
+  <span class="kicker">3 · The idea</span>
+  <h2>Keep the rules. Learn only the forces.</h2>
+  <p>There are two common ways to make a legged robot walk. One writes down the physics and solves for the forces, usually with a planner that looks a fraction of a second ahead. It is predictable, but its model of the robot is never quite right. The other trains a neural network to command the joints directly, by trial and error in simulation. It copes well with messy ground, but it needs a great deal of practice and is hard to reason about.</p>
+  <p>I kept the structure of the first and replaced one part of it. A gait clock still decides which feet are down. Simple rules still place the feet and lift them. A whole-body controller still turns forces into motor commands, five hundred times a second. Only the forces come from a network, fifty times a second, and its outputs are shaped so they always fall inside the friction cone.</p>
+  <figure>
+    <svg viewBox="0 0 520 250" role="img" aria-label="The layers of the controller">
+      <g font-size="13">
+        <rect x="0.5" y="6.5" width="519" height="40" rx="8" fill="none" stroke="var(--rule)"/>
+        <text x="16" y="31" fill="var(--ink)" font-weight="600">You, with the joystick</text><text x="504" y="31" text-anchor="end" fill="var(--ink-3)" font-size="12">speed, turn, gait</text>
+        <rect x="0.5" y="58.5" width="251" height="54" rx="8" fill="none" stroke="var(--rule)"/>
+        <text x="16" y="81" fill="var(--ink)" font-weight="600">Gait clock and footholds</text><text x="16" y="100" fill="var(--ink-3)" font-size="12">rules: which feet, and where</text>
+        <rect x="268" y="58" width="252" height="54" rx="8" fill="var(--flame)"/>
+        <text x="284" y="81" fill="#fff" font-weight="700">Neural network</text><text x="284" y="100" fill="#fff" font-size="12">learned: how hard each foot pushes</text>
+        <rect x="0.5" y="124.5" width="519" height="54" rx="8" fill="none" stroke="var(--rule)"/>
+        <text x="16" y="147" fill="var(--ink)" font-weight="600">Whole-body controller</text><text x="16" y="166" fill="var(--ink-3)" font-size="12">rules: forces and swing paths into commands for twelve motors</text>
+        <rect x="0.5" y="190.5" width="519" height="54" rx="8" fill="none" stroke="var(--rule)"/>
+        <text x="16" y="213" fill="var(--ink)" font-weight="600">Safety supervisor</text><text x="16" y="232" fill="var(--ink-3)" font-size="12">watches every command and sensor; can sit the robot down or cut power</text>
+      </g>
+    </svg>
+    <figcaption><b>Figure 1.</b> Only the orange box is learned. Everything else is ordinary control engineering that can be read and checked.</figcaption>
+  </figure>
+  <button class="go" data-scene="duel-rules">Compare rules and learned forces</button>
+  <p>Two copies of the robot now get the same command: forward at 0.5 m/s while turning. The one marked blue takes its forces from the hand-written rule, the one marked orange from the network. Same ground, same sensors, same motors. The panel at the top of the stage keeps score.</p>
+  <p class="note">Over the full test, 107 situations and three separately trained networks, the learned forces cut the typical turn-rate error from <span class="num">0.20</span> to <span class="num">0.12 rad/s</span> and raised the share of runs without a fall from <span class="num">91 %</span> to <span class="num">94.5 %</span>. A network that commands the joints directly, trained for as long, followed the commanded speed three times worse.</p>
+</section>
+
+<section class="chapter" id="c4">
+  <span class="kicker">4 · Learning</span>
+  <h2>Teaching it through a simpler world</h2>
+  <p>The usual way to train such a network, PPO, tries small random variations and keeps the ones that score better. It works, but it learns from noise, so it needs many tries.</p>
+  <p>I used a method called SHAC, which follows the slope of the score directly: if this foot had pushed a little harder, how much better would the walk have been? Answering that needs derivatives of the physics. Full contact physics gives poor ones, because a foot touching down is an abrupt event. So the derivative comes from a much simpler model, the trunk as one rigid block pushed by four forces, while every value still comes from the full simulator.</p>
+  <figure>
+    <svg id="eff" viewBox="0 0 520 150" role="img" aria-label="Training steps each method needed"></svg>
+    <figcaption><b>Figure 2.</b> Simulated steps each method needed to reach the score PPO ended with, for three training runs each. SHAC needed about a fifth as many.</figcaption>
+  </figure>
+  <p class="note">I also checked whether the derivative through the full simulator could be used instead. On flat ground and gentle ramps it could. On steep ramps, blocks and stairs it often pointed the wrong way. The simple model was the better teacher for this robot.</p>
+  <button class="go" data-scene="duel-ppo">Compare the two training methods</button>
+  <p>Neither method wins everything. With the same controller around them, the SHAC network follows turns more closely and survives stairs more often. The PPO network follows forward speed slightly more closely and uses a little less torque.</p>
+</section>
+
+<section class="chapter" id="c5">
+  <span class="kicker">5 · Ground</span>
+  <h2>Ramps, blocks and stairs, climbed blind</h2>
+  <p>The test ground is a grid of 16 m patches: flat floor, ramps of 5° to 20°, fields of random blocks up to 8 cm high, and stairs with 5 cm and 10 cm steps. The <b>Ground</b> button on the stage puts the robot on any of them.</p>
+  <button class="go" data-scene="stairs">Put it in front of 10 cm stairs</button>
+  <figure>
+    <div class="pills" id="ground"></div>
+    <div class="pills" id="metric"></div>
+    <svg id="dots" viewBox="0 0 520 260" role="img" aria-label="Controllers compared on the chosen ground"></svg>
+    <figcaption id="dotsCap"><b>Figure 3.</b></figcaption>
+  </figure>
+  <p class="note">On the 20° ramp, the rules alone fall in about one run in seven; with learned forces the robot almost never falls there. On 10 cm stairs going up, the network that commands the joints survives most often, but mostly because it hardly moves.</p>
+</section>
+
+<section class="chapter" id="c6">
+  <span class="kicker">6 · Against a planner</span>
+  <h2>Is learning worth it against a well-tuned planner?</h2>
+  <p>The fair opponent is the part the network replaced: a model-predictive controller that solves an optimisation problem to plan the forces. I tuned one over many settings and put it in the same stack.</p>
+  <p>The result was close. In how often the robot stays up and how well it follows speed, the two cannot be told apart, and the planner uses slightly less joint torque. The difference is cost. The network takes about 15 µs to evaluate. The planner needs up to 2.2 ms, longer than one 2 ms control cycle, so it can replan only every 4 ms. At that rate the learned forces follow speed and turns more closely.</p>
+  <button class="go" data-scene="duel-mpc">Run the learned forces against the planner</button>
+  <p class="note">The score panel shows how long each controller takes per cycle, measured in your browser as it runs. The planner's number is the one to watch.</p>
+</section>
+
+<section class="chapter" id="c7">
+  <span class="kicker">7 · Safety</span>
+  <h2>A robot that knows when to give up</h2>
+  <p>A walking robot that falls with its motors at full power can break itself. Around the walking controller sits a supervisor: a small state machine with limits on every command, checks on every sensor, and a learned detector that recognises a fall while it is happening. When it sees one, it folds the legs in and lets the robot down.</p>
+  <figure>
+    <svg class="fsm" id="fsm" viewBox="0 0 520 200" role="img" aria-label="Supervisor states"></svg>
+    <figcaption><b>Figure 4.</b> The supervisor's main states. The highlighted one is the state of the robot on the stage right now.</figcaption>
+  </figure>
+  <button class="go" data-scene="safety">Shove it hard enough to fall</button>
+  <p class="note">The supervisor also handles faults that are harder to show here: a lost radio link, a motor that dies, a frozen sensor. In simulation it handled every scenario I wrote for it.</p>
+</section>
+
+<section class="chapter" id="c8">
+  <span class="kicker">8 · The real floor</span>
+  <h2>What changes when the floor is real?</h2>
+  <p>Everything on this page runs the robot's own program: the same estimator, controller, network and supervisor, compiled unchanged, using about 2 % of each 2 ms cycle. Here it walks on a floor that is exactly as the simulator says, with motors that never warm up and a body that matches its model to the gram.</p>
+  <p>A real floor is less polite. Friction changes from one step to the next, motors heat as they work, and the body is never quite what the model says. The network learned how hard to push in a world without those surprises. How much of that knowledge survives contact with the real thing is the question this work walks towards.</p>
+  <p>Other directions I find worth trying:</p>
+  <ul class="plain">
+    <li>Learn forces on top of the tuned planner, to see whether they still add something.</li>
+    <li>Let the network choose footholds too, at least on easy ground where the simulator's derivatives can be trusted.</li>
+    <li>Teach the motors' heat limits during training. The knees run above their continuous rating with every controller.</li>
+    <li>Give it a way to see stairs before stepping on them.</li>
+  </ul>
+  <button class="door" id="enterWorld2"><b>Walk it yourself in the Proving Grounds</b><span>The same robot in a generated valley, with a quest line through everything above.</span></button>
+  <p class="sig">The simulation is MuJoCo 3.7.0 and the robot's onboard C++ controller compiled to WebAssembly, with the trained networks and the test ground from the thesis. It differs from the robot build in two ways: it runs on one thread, and the robot is lifted clear of the ground before it starts.</p>
+</section>
+
+</main>
+
+<div class="stagecol">
+  <div class="stage" id="stage">
+    <canvas class="gl" id="gl" aria-label="Live simulation of the robot"></canvas>
+    <div id="labels"></div>
+    <!-- story HUD -->
+    <div class="ov tl" id="tl" data-only="story" hidden><span class="chip" id="cScene">—</span><span class="chip"><i class="dot" id="cDot"></i><span id="cState">—</span></span></div>
+    <div class="tally" id="tally" data-only="story" hidden></div>
+    <!-- world HUD -->
+    <div class="quest" id="quest" data-only="world" hidden></div>
+    <div class="sheet" id="sheet" data-only="world" hidden></div>
+    <div class="banner" id="banner" hidden><small id="bannerK"></small><b id="bannerT"></b></div>
+    <!-- shared -->
+    <div class="ov tr" id="tr" hidden>
+      <button class="sbtn" id="bJournal" data-only="world" aria-expanded="false">Journal</button>
+      <button class="sbtn" id="bWorld" data-only="world" aria-expanded="false">World</button>
+      <button class="sbtn" id="bBrain" aria-expanded="false">Controller</button>
+      <button class="sbtn" id="bMap" aria-expanded="false">Map</button>
+      <button class="sbtn" id="bPlace" aria-pressed="false">Pick up</button>
+      <button class="sbtn" id="bReset" data-only="story">Restart</button>
+      <button class="sbtn" id="bExit" data-only="world">Leave</button>
+    </div>
+    <div class="hint" id="hint" hidden></div>
+    <div class="placebar" id="placebar" hidden><span>Tap the ground to set it down there. Drag to choose which way it faces.</span><span class="btns"><button class="sbtn" id="pHere">Upright, here</button><button class="sbtn" id="pCancel">Cancel</button></span></div>
+    <div class="panel" id="pBrain" hidden><h4>Who chooses the foot forces <button data-close aria-label="Close">×</button></h4><div class="list" id="brains"></div></div>
+    <div class="panel" id="pMap" hidden><h4><span id="mapTitle">Test ground</span> <button data-close aria-label="Close">×</button></h4><canvas id="map" width="320" height="320" aria-label="Map of the test ground; select a place"></canvas><div id="mapList" class="list"></div></div>
+    <div class="panel" id="pWorld" hidden><h4>Shape the valley <button data-close aria-label="Close">×</button></h4>
+      <div class="field"><label for="wSeed">Seed</label><span><input id="wSeed" type="number" min="1" max="99999" step="1"><button class="sbtn" id="wDice" aria-label="Random seed">Roll</button></span></div>
+      <div class="field"><label for="wHills">Hills</label><input id="wHills" type="range" min="0" max="2" step="0.1"><output id="oHills"></output></div>
+      <div class="field"><label for="wRocks">Rocks</label><input id="wRocks" type="range" min="0" max="2" step="0.1"><output id="oRocks"></output></div>
+      <div class="field"><label for="wForest">Forest</label><input id="wForest" type="range" min="0" max="2" step="0.1"><output id="oForest"></output></div>
+      <div class="field"><label for="wRiser">Stair step</label><input id="wRiser" type="range" min="0.05" max="0.14" step="0.01"><output id="oRiser"></output></div>
+      <div class="field"><label for="wSteep">Steep face</label><input id="wSteep" type="range" min="10" max="28" step="1"><output id="oSteep"></output></div>
+      <p class="warnbox" id="wWarn" hidden></p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="sbtn hot" id="wGo">Generate</button><button class="sbtn" id="wReset">Defaults</button></div>
+      <span style="color:var(--ink-2)">The networks were trained on slopes up to 20°, blocks up to 8 cm and steps up to 10 cm. Beyond that, you are testing them on ground they never saw.</span>
+    </div>
+    <div class="panel" id="pJournal" hidden><h4>Journal <button data-close aria-label="Close">×</button></h4><div class="journal" id="journal"></div></div>
+    <div class="ov bl" id="bl" hidden>
+      <div class="joy" id="joy" role="slider" aria-label="Speed and turn" aria-valuetext="stopped" tabindex="0"><div class="knob" id="knob"></div></div>
+      <div class="joylab"><b>Drive</b><span id="jV">0.00 m/s</span><span id="jS">side 0.00 m/s</span><span id="jW">turn 0.00 rad/s</span>
+        <span style="display:flex;gap:4px;margin-top:4px"><button class="sbtn" id="gTrot" aria-pressed="true">Trot</button><button class="sbtn" id="gCrawl" aria-pressed="false">Crawl</button></span></div>
+    </div>
+    <canvas class="strip" id="strip" data-only="story" hidden></canvas>
+    <div class="ov br" id="br" hidden>
+      <div class="turn" id="turn" role="slider" aria-label="Turn" tabindex="0"><div class="tknob" id="tknob"></div><span>turn</span></div>
+      <button class="sbtn" id="bShove">Shove 300 N</button>
+      <span class="chip num" id="cRate">—</span>
+    </div>
+    <div class="toast" id="toast" hidden><h3 id="toastH" hidden></h3><span id="toastText"></span><div class="btns" id="toastBtns"></div></div>
+    <div class="gen" id="gen" hidden><b>Shaping the valley</b><div class="prog"><i id="genbar"></i></div><span id="genmsg"></span></div>
+    <div class="poster" id="poster">
+      <svg width="64" height="40" viewBox="0 0 64 40" aria-hidden="true"><rect x="8" y="6" width="48" height="12" rx="4" fill="var(--ink)"/><path d="M14 18l-4 10 4 10M50 18l-4 10 4 10M22 18l4 10-4 10M42 18l4 10-4 10" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
+      <p>The robot's real control program and physics simulator, about 37 MB. It downloads once, then runs on your own device.</p>
+      <button class="wake" id="wake">Wake the robot</button>
+      <div class="prog" hidden id="prog"><i id="progbar"></i></div>
+      <p id="loadmsg" style="font-size:.78rem"></p>
+    </div>
+  </div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="world.js"></script>
+<script src="fia_sim.js"></script>
+<script>
+const DATA = {"arms":{"all":{"survival":{"model":[0.9112,0.8686,0.948,107],"shac":[0.9448,0.9059,0.9763,107],"ppo_hybrid":[0.9315,0.8868,0.9681,107],"e2e":[0.8602,0.8235,0.8945,107],"e2e_long":[0.8924,0.8623,0.9202,107],"mpc":[0.948,0.9077,0.9804,107]},"lin_vel_rmse":{"model":[0.0974,0.0848,0.1119,107],"shac":[0.0893,0.0764,0.1031,107],"ppo_hybrid":[0.0959,0.0829,0.1109,107],"e2e":[0.3144,0.2719,0.3578,107],"e2e_long":[0.2585,0.2243,0.2939,107],"mpc":[0.0933,0.0824,0.1053,107]},"yaw_rate_rmse":{"model":[0.2009,0.1785,0.2251,107],"shac":[0.1176,0.0986,0.1379,107],"ppo_hybrid":[0.1715,0.1481,0.1976,107],"e2e":[0.3641,0.32,0.4093,107],"e2e_long":[0.342,0.305,0.3804,107],"mpc":[0.1294,0.1125,0.1479,107]},"torque_rms":{"model":[17.2606,16.9674,17.5747,107],"shac":[16.1071,15.7741,16.4478,107],"ppo_hybrid":[16.3667,16.0967,16.6606,107],"e2e":[18.9715,18.4316,19.5172,107],"e2e_long":[20.1796,19.6686,20.6991,107],"mpc":[15.9131,15.548,16.2744,107]},"torque_rms_knee":{"model":[23.8772,23.6875,24.0866,107],"shac":[22.5749,22.3234,22.825,107],"ppo_hybrid":[23.1869,23.0016,23.3886,107],"e2e":[20.9094,20.3724,21.4444,107],"e2e_long":[24.0666,23.5257,24.6049,107],"mpc":[21.8737,21.5741,22.1705,107]}},"general":{"survival":{"model":[0.9679,0.9487,0.9838,75],"shac":[0.9989,0.9976,0.9999,75],"ppo_hybrid":[0.9985,0.9972,0.9994,75],"e2e":[0.8756,0.8357,0.9113,75],"e2e_long":[0.9004,0.8679,0.929,75],"mpc":[0.9992,0.9979,1.0,75]},"lin_vel_rmse":{"model":[0.0832,0.072,0.0958,75],"shac":[0.076,0.0643,0.0899,75],"ppo_hybrid":[0.0796,0.0703,0.0903,75],"e2e":[0.2889,0.2389,0.341,75],"e2e_long":[0.2319,0.1954,0.2696,75],"mpc":[0.0804,0.0725,0.0893,75]},"yaw_rate_rmse":{"model":[0.163,0.147,0.1799,75],"shac":[0.083,0.073,0.0939,75],"ppo_hybrid":[0.1291,0.117,0.1418,75],"e2e":[0.3588,0.3069,0.4152,75],"e2e_long":[0.3353,0.2924,0.3817,75],"mpc":[0.1003,0.0918,0.1091,75]},"torque_rms":{"model":[16.9514,16.6733,17.2392,75],"shac":[15.9189,15.5508,16.2926,75],"ppo_hybrid":[16.0916,15.8463,16.3489,75],"e2e":[18.4596,17.7973,19.1371,75],"e2e_long":[19.798,19.1561,20.4417,75],"mpc":[15.7322,15.3528,16.1172,75]},"torque_rms_knee":{"model":[23.6211,23.4853,23.7575,75],"shac":[22.4603,22.196,22.7188,75],"ppo_hybrid":[22.9737,22.8383,23.1097,75],"e2e":[20.4021,19.7374,21.0893,75],"e2e_long":[23.7034,23.0141,24.404,75],"mpc":[21.73,21.4143,22.0334,75]}},"flat":{"survival":{"model":[1.0,1.0,1.0,15],"shac":[1.0,1.0,1.0,15],"ppo_hybrid":[1.0,1.0,1.0,15],"e2e":[0.9938,0.9833,1.0,15],"e2e_long":[0.9938,0.9833,1.0,15],"mpc":[1.0,1.0,1.0,15]},"lin_vel_rmse":{"model":[0.0475,0.0411,0.0542,15],"shac":[0.0476,0.0402,0.0565,15],"ppo_hybrid":[0.0501,0.0448,0.056,15],"e2e":[0.1696,0.1219,0.2223,15],"e2e_long":[0.1462,0.1065,0.1873,15],"mpc":[0.059,0.0525,0.0663,15]},"yaw_rate_rmse":{"model":[0.1177,0.0933,0.1408,15],"shac":[0.052,0.0432,0.0618,15],"ppo_hybrid":[0.0877,0.0705,0.1072,15],"e2e":[0.361,0.2564,0.4807,15],"e2e_long":[0.3096,0.2303,0.3975,15],"mpc":[0.0858,0.07,0.1038,15]},"torque_rms":{"model":[16.6556,16.1149,17.2896,15],"shac":[15.6673,14.98,16.4083,15],"ppo_hybrid":[15.9003,15.4808,16.4219,15],"e2e":[18.7501,17.4156,20.1294,15],"e2e_long":[19.8588,18.5084,21.1988,15],"mpc":[15.6868,14.8642,16.5356,15]},"torque_rms_knee":{"model":[23.4565,23.2128,23.7365,15],"shac":[22.4098,21.896,22.9123,15],"ppo_hybrid":[22.8532,22.6709,23.0675,15],"e2e":[20.8707,19.5637,22.2074,15],"e2e_long":[24.3427,23.0157,25.6563,15],"mpc":[21.7628,21.088,22.4097,15]}},"slope10":{"survival":{"model":[0.9875,0.9729,0.9979,15],"shac":[1.0,1.0,1.0,15],"ppo_hybrid":[1.0,1.0,1.0,15],"e2e":[0.8736,0.7729,0.9507,15],"e2e_long":[0.9153,0.8507,0.9646,15],"mpc":[1.0,1.0,1.0,15]},"lin_vel_rmse":{"model":[0.0696,0.0627,0.0773,15],"shac":[0.0579,0.0468,0.0713,15],"ppo_hybrid":[0.0657,0.0594,0.072,15],"e2e":[0.2987,0.1998,0.4065,15],"e2e_long":[0.2042,0.1487,0.2616,15],"mpc":[0.0703,0.0633,0.0781,15]},"yaw_rate_rmse":{"model":[0.1559,0.1302,0.1804,15],"shac":[0.067,0.0558,0.0791,15],"ppo_hybrid":[0.1206,0.1025,0.1385,15],"e2e":[0.3538,0.2497,0.4759,15],"e2e_long":[0.3179,0.2323,0.4202,15],"mpc":[0.0955,0.081,0.1123,15]},"torque_rms":{"model":[16.9172,16.3674,17.5934,15],"shac":[15.9554,15.2084,16.7982,15],"ppo_hybrid":[16.0592,15.6178,16.6248,15],"e2e":[18.1277,16.6749,19.5885,15],"e2e_long":[19.5692,18.268,20.8919,15],"mpc":[15.7917,14.9884,16.6239,15]},"torque_rms_knee":{"model":[23.5962,23.3188,23.9119,15],"shac":[22.4842,21.9276,23.039,15],"ppo_hybrid":[22.9281,22.6842,23.2023,15],"e2e":[19.7894,18.2839,21.3146,15],"e2e_long":[23.4096,22.0342,24.7963,15],"mpc":[21.799,21.0998,22.466,15]}},"slope20":{"survival":{"model":[0.8604,0.7979,0.9167,15],"shac":[0.9958,0.991,1.0,15],"ppo_hybrid":[0.9958,0.991,0.9993,15],"e2e":[0.6347,0.5653,0.6951,15],"e2e_long":[0.7063,0.6403,0.766,15],"mpc":[0.9958,0.9896,1.0,15]},"lin_vel_rmse":{"model":[0.1733,0.1519,0.1953,15],"shac":[0.1482,0.1096,0.1925,15],"ppo_hybrid":[0.1512,0.1307,0.1756,15],"e2e":[0.3461,0.2239,0.4844,15],"e2e_long":[0.2981,0.2202,0.3812,15],"mpc":[0.1363,0.116,0.1583,15]},"yaw_rate_rmse":{"model":[0.2457,0.201,0.2922,15],"shac":[0.1439,0.1178,0.1717,15],"ppo_hybrid":[0.1935,0.1668,0.2182,15],"e2e":[0.3576,0.2409,0.4976,15],"e2e_long":[0.3583,0.2495,0.4894,15],"mpc":[0.1317,0.1159,0.1484,15]},"torque_rms":{"model":[17.5458,17.05,18.1466,15],"shac":[16.6547,15.7113,17.6538,15],"ppo_hybrid":[16.4435,15.9451,17.0432,15],"e2e":[16.5684,15.4882,17.726,15],"e2e_long":[18.4791,17.4648,19.5948,15],"mpc":[16.1726,15.3239,17.0493,15]},"torque_rms_knee":{"model":[23.7458,23.4615,24.049,15],"shac":[22.6923,21.9635,23.4172,15],"ppo_hybrid":[23.0712,22.7354,23.4374,15],"e2e":[18.3277,17.3064,19.4482,15],"e2e_long":[20.8906,19.8287,22.0145,15],"mpc":[21.8988,21.1575,22.5908,15]}},"rough4":{"survival":{"model":[0.9979,0.9938,1.0,15],"shac":[1.0,1.0,1.0,15],"ppo_hybrid":[1.0,1.0,1.0,15],"e2e":[0.9736,0.9486,0.9938,15],"e2e_long":[0.9833,0.9632,0.9986,15],"mpc":[1.0,1.0,1.0,15]},"lin_vel_rmse":{"model":[0.0553,0.048,0.0633,15],"shac":[0.0553,0.047,0.0648,15],"ppo_hybrid":[0.0572,0.0512,0.0638,15],"e2e":[0.2607,0.1777,0.3528,15],"e2e_long":[0.1862,0.1354,0.2412,15],"mpc":[0.0626,0.0569,0.0686,15]},"yaw_rate_rmse":{"model":[0.134,0.1115,0.157,15],"shac":[0.0632,0.0532,0.0746,15],"ppo_hybrid":[0.1039,0.0868,0.1231,15],"e2e":[0.3708,0.2639,0.4954,15],"e2e_long":[0.3433,0.2574,0.4368,15],"mpc":[0.088,0.0716,0.107,15]},"torque_rms":{"model":[16.7362,16.1996,17.3745,15],"shac":[15.644,14.9698,16.3842,15],"ppo_hybrid":[15.9584,15.4861,16.5393,15],"e2e":[19.2363,17.794,20.6373,15],"e2e_long":[20.265,18.7927,21.6586,15],"mpc":[15.546,14.7265,16.3872,15]},"torque_rms_knee":{"model":[23.5635,23.311,23.8587,15],"shac":[22.3848,21.8741,22.9006,15],"ppo_hybrid":[22.9452,22.7006,23.2271,15],"e2e":[21.4191,19.9574,22.8471,15],"e2e_long":[24.8084,23.3851,26.2011,15],"mpc":[21.6477,20.9583,22.2865,15]}},"rough8":{"survival":{"model":[0.9938,0.9833,1.0,15],"shac":[0.9986,0.9965,1.0,15],"ppo_hybrid":[0.9965,0.9931,0.9993,15],"e2e":[0.9021,0.8618,0.9375,15],"e2e_long":[0.9035,0.8562,0.9451,15],"mpc":[1.0,1.0,1.0,15]},"lin_vel_rmse":{"model":[0.0702,0.059,0.0825,15],"shac":[0.0708,0.0573,0.0855,15],"ppo_hybrid":[0.0738,0.0618,0.0868,15],"e2e":[0.3694,0.2363,0.5196,15],"e2e_long":[0.3249,0.2099,0.453,15],"mpc":[0.0739,0.064,0.0848,15]},"yaw_rate_rmse":{"model":[0.1617,0.1411,0.1825,15],"shac":[0.0887,0.0729,0.105,15],"ppo_hybrid":[0.1399,0.1178,0.1625,15],"e2e":[0.351,0.2307,0.4971,15],"e2e_long":[0.3477,0.2511,0.4549,15],"mpc":[0.1004,0.0819,0.1199,15]},"torque_rms":{"model":[16.9022,16.2962,17.6329,15],"shac":[15.6732,14.9604,16.4603,15],"ppo_hybrid":[16.0967,15.5182,16.7948,15],"e2e":[19.6152,18.0378,21.1929,15],"e2e_long":[20.8178,19.1554,22.5093,15],"mpc":[15.4638,14.632,16.3267,15]},"torque_rms_knee":{"model":[23.7435,23.417,24.1257,15],"shac":[22.3305,21.7908,22.8717,15],"ppo_hybrid":[23.0707,22.7082,23.4794,15],"e2e":[21.6036,20.1118,23.1068,15],"e2e_long":[25.0658,23.5974,26.579,15],"mpc":[21.5415,20.8505,22.2112,15]}},"stairs5_up":{"survival":{"model":[0.8711,0.6211,1.0,8],"shac":[0.875,0.625,1.0,8],"ppo_hybrid":[0.875,0.625,1.0,8],"e2e":[0.9779,0.9557,0.9961,8],"e2e_long":[0.9453,0.8672,0.9961,8],"mpc":[0.875,0.625,1.0,8]},"lin_vel_rmse":{"model":[0.0705,0.0545,0.0929,8],"shac":[0.0638,0.05,0.0845,8],"ppo_hybrid":[0.0722,0.058,0.0935,8],"e2e":[0.4237,0.2676,0.6127,8],"e2e_long":[0.3697,0.2363,0.539,8],"mpc":[0.0742,0.0616,0.092,8]},"yaw_rate_rmse":{"model":[0.1629,0.1314,0.2038,8],"shac":[0.104,0.0691,0.1628,8],"ppo_hybrid":[0.1443,0.1145,0.1845,8],"e2e":[0.3411,0.217,0.5011,8],"e2e_long":[0.367,0.248,0.5124,8],"mpc":[0.11,0.0757,0.1538,8]},"torque_rms":{"model":[17.12,16.3461,18.2329,8],"shac":[16.1031,15.0712,17.4543,8],"ppo_hybrid":[16.3036,15.553,17.3545,8],"e2e":[20.8723,19.5553,22.09,8],"e2e_long":[21.6901,20.1864,23.2337,8],"mpc":[15.5443,14.5225,16.6713,8]},"torque_rms_knee":{"model":[23.9706,23.4466,24.7391,8],"shac":[22.8144,21.91,24.0212,8],"ppo_hybrid":[23.3486,22.7247,24.155,8],"e2e":[22.3113,20.9539,23.5501,8],"e2e_long":[24.6818,23.4546,25.8804,8],"mpc":[21.7225,20.7344,22.7106,8]}},"stairs5_down":{"survival":{"model":[0.8555,0.6055,0.9961,8],"shac":[0.875,0.625,1.0,8],"ppo_hybrid":[0.8724,0.6224,1.0,8],"e2e":[0.819,0.6641,0.9297,8],"e2e_long":[0.9102,0.776,0.9883,8],"mpc":[0.875,0.625,1.0,8]},"lin_vel_rmse":{"model":[0.0737,0.0575,0.0934,8],"shac":[0.0654,0.0494,0.089,8],"ppo_hybrid":[0.0719,0.0589,0.0925,8],"e2e":[0.3003,0.2011,0.4228,8],"e2e_long":[0.2128,0.1468,0.295,8],"mpc":[0.0897,0.059,0.1425,8]},"yaw_rate_rmse":{"model":[0.1988,0.1408,0.2547,8],"shac":[0.0942,0.0588,0.1521,8],"ppo_hybrid":[0.1494,0.1081,0.201,8],"e2e":[0.3845,0.2673,0.5278,8],"e2e_long":[0.3338,0.2311,0.4585,8],"mpc":[0.1466,0.0855,0.2434,8]},"torque_rms":{"model":[17.1588,16.4923,18.1284,8],"shac":[15.8835,14.8844,17.0973,8],"ppo_hybrid":[16.2884,15.6493,17.2387,8],"e2e":[20.1027,18.4498,21.7127,8],"e2e_long":[20.8663,19.6007,22.3279,8],"mpc":[15.9318,14.7315,17.3029,8]},"torque_rms_knee":{"model":[23.7181,23.3972,24.1534,8],"shac":[22.3243,21.6475,22.9843,8],"ppo_hybrid":[23.0688,22.7224,23.5281,8],"e2e":[22.4758,20.8442,23.995,8],"e2e_long":[25.5402,24.0228,27.1476,8],"mpc":[21.7888,20.7199,22.7616,8]}},"stairs10_up":{"survival":{"model":[0.625,0.4023,0.8281,8],"shac":[0.7227,0.5612,0.8594,8],"ppo_hybrid":[0.543,0.3333,0.7422,8],"e2e":[0.918,0.8203,0.9883,8],"e2e_long":[0.9167,0.8594,0.9688,8],"mpc":[0.7148,0.5117,0.8906,8]},"lin_vel_rmse":{"model":[0.233,0.1471,0.3369,8],"shac":[0.2009,0.1368,0.278,8],"ppo_hybrid":[0.2495,0.1586,0.3616,8],"e2e":[0.4389,0.2742,0.6409,8],"e2e_long":[0.4346,0.2685,0.6398,8],"mpc":[0.2016,0.1245,0.2887,8]},"yaw_rate_rmse":{"model":[0.4366,0.3203,0.5751,8],"shac":[0.3433,0.2599,0.4349,8],"ppo_hybrid":[0.4853,0.3525,0.6279,8],"e2e":[0.3489,0.2221,0.5144,8],"e2e_long":[0.3356,0.2128,0.5001,8],"mpc":[0.3037,0.2092,0.3988,8]},"torque_rms":{"model":[19.4631,17.6451,21.6745,8],"shac":[17.6493,16.088,19.3907,8],"ppo_hybrid":[18.4486,16.6945,20.5419,8],"e2e":[20.9475,19.6266,22.1315,8],"e2e_long":[21.6143,20.3937,22.845,8],"mpc":[17.3986,15.544,19.362,8]},"torque_rms_knee":{"model":[25.7966,24.3309,27.4635,8],"shac":[23.7046,22.2312,25.2459,8],"ppo_hybrid":[24.7633,23.2768,26.3994,8],"e2e":[22.2955,20.9712,23.4578,8],"e2e_long":[24.7583,23.8416,25.6561,8],"mpc":[23.2566,21.5038,25.0128,8]}},"stairs10_down":{"survival":{"model":[0.7617,0.5195,0.9375,8],"shac":[0.7995,0.5755,0.9609,8],"ppo_hybrid":[0.8073,0.5625,0.9714,8],"e2e":[0.582,0.3984,0.7409,8],"e2e_long":[0.7227,0.5286,0.8737,8],"mpc":[0.8477,0.5898,0.9922,8]},"lin_vel_rmse":{"model":[0.1459,0.115,0.1737,8],"shac":[0.1523,0.1142,0.1896,8],"ppo_hybrid":[0.1425,0.1071,0.1826,8],"e2e":[0.3337,0.2406,0.4343,8],"e2e_long":[0.2663,0.2003,0.3476,8],"mpc":[0.1278,0.091,0.171,8]},"yaw_rate_rmse":{"model":[0.3608,0.2627,0.4512,8],"shac":[0.2541,0.1689,0.3444,8],"ppo_hybrid":[0.3037,0.2141,0.4053,8],"e2e":[0.4315,0.2888,0.5978,8],"e2e_long":[0.3943,0.2723,0.5497,8],"mpc":[0.2306,0.1505,0.3239,8]},"torque_rms":{"model":[18.199,17.3152,19.2294,8],"shac":[16.5567,15.3158,17.8921,8],"ppo_hybrid":[17.0055,16.0572,18.1423,8],"e2e":[18.7633,17.2916,20.4491,8],"e2e_long":[20.126,18.903,21.5395,8],"mpc":[16.4737,15.0161,18.1861,8]},"torque_rms_knee":{"model":[24.4241,23.8406,25.0056,8],"shac":[22.5308,21.634,23.4092,8],"ppo_hybrid":[23.5656,22.8591,24.2946,8],"e2e":[21.3108,19.9926,22.7746,8],"e2e_long":[24.6911,23.2276,26.2583,8],"mpc":[22.0747,20.9212,23.2688,8]}}},"grad":[[0,"flat","forces",0.9751,true],[0,"flat","footholds",0.9777,true],[0,"flat","swing",0.9951,true],[0,"slope10","forces",0.8677,true],[0,"slope10","footholds",0.8253,false],[0,"slope10","swing",0.9903,true],[0,"slope20","forces",-0.3252,false],[0,"slope20","footholds",0.398,false],[0,"slope20","swing",0.9423,false],[0,"rough8","forces",0.1567,false],[0,"rough8","footholds",0.7673,false],[0,"rough8","swing",0.9256,false],[0,"stairs10_up","forces",-0.131,false],[0,"stairs10_up","footholds",0.2879,false],[0,"stairs10_up","swing",-0.8009,false],[0,"stairs10_down","forces",0.2358,false],[0,"stairs10_down","footholds",0.9421,false],[0,"stairs10_down","swing",0.9732,false],[1,"flat","forces",0.8784,true],[1,"flat","footholds",0.9771,true],[1,"flat","swing",0.9984,false],[1,"slope10","forces",0.8137,true],[1,"slope10","footholds",0.9352,true],[1,"slope10","swing",0.9963,false],[1,"slope20","forces",0.4269,false],[1,"slope20","footholds",0.5033,true],[1,"slope20","swing",0.9597,false],[1,"rough8","forces",0.6774,true],[1,"rough8","footholds",0.7516,false],[1,"rough8","swing",0.9342,true],[1,"stairs10_up","forces",0.8678,false],[1,"stairs10_up","footholds",0.9366,false],[1,"stairs10_up","swing",0.4304,false],[1,"stairs10_down","forces",0.2299,false],[1,"stairs10_down","footholds",0.7626,false],[1,"stairs10_down","swing",0.9301,false]],"safety":[["push_small","STAND",true],["push_step","STAND",true],["push_fall","GROUNDED",true],["link_loss","SIT",true],["faults","EMERGENCY",true],["cmd_abuse","LOCOMOTE",true],["motor_dead_sit","SIT",true],["motor_dead_limp","EMERGENCY",true],["fault_recovery","LOCOMOTE",true],["motor_weak","SIT",true],["joint_stiff","SIT",true],["joint_locked","EMERGENCY",true],["imu_frozen","SIT",true],["imu_bias","SIT",true],["imu_noisy","SIT",true],["encoder_jump","EMERGENCY",true],["motor_dead_j2_sit","GROUNDED",true],["motor_dead_j2_limp","EMERGENCY",true],["motor_dead_j4_sit","SIT",true],["motor_dead_j4_limp","EMERGENCY",true],["motor_dead_j6_sit","GROUNDED",true],["motor_dead_j6_limp","EMERGENCY",true],["motor_dead_j9_sit","SIT",true],["motor_dead_j9_limp","EMERGENCY",true]]};
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const store={get(k,d){try{const v=localStorage.getItem('fia.'+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem('fia.'+k,JSON.stringify(v))}catch(e){}}};
+const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const LOWMEM=IOS||(navigator.deviceMemory&&navigator.deviceMemory<=4)||Math.min(screen.width,screen.height)<600;
+
+/* ================= figures ================= */
+const ARMS=[['model','Rules only','--ink-3'],['shac','Learned forces, SHAC','--flame'],['ppo_hybrid','Learned forces, PPO','--b'],['mpc','Planner (MPC)','--warn'],['e2e','Network drives joints','--ink-2']];
+const GROUND=[['all','Everything'],['flat','Flat'],['slope10','Ramp 10°'],['slope20','Ramp 20°'],['rough4','Blocks 4 cm'],['rough8','Blocks 8 cm'],['stairs5_up','Stairs 5 cm up'],['stairs5_down','5 cm down'],['stairs10_up','Stairs 10 cm up'],['stairs10_down','10 cm down']];
+const METRIC=[['survival','Stays up',true,'share of 20 s runs that end without a fall'],['lin_vel_rmse','Follows speed',false,'typical speed error, m/s'],['yaw_rate_rmse','Follows turns',false,'typical turn-rate error, rad/s']];
+let gSel='all',mSel='survival';
+function pills(el,list,get,set){el.innerHTML='';list.forEach(([k,l])=>{const b=document.createElement('button');b.textContent=l;b.setAttribute('aria-pressed',k===get());b.onclick=()=>{set(k);el.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));drawDots()};el.append(b)})}
+pills($('ground'),GROUND,()=>gSel,k=>gSel=k);pills($('metric'),METRIC,()=>mSel,k=>mSel=k);
+function drawDots(){
+  const rows=DATA.arms[gSel][mSel],M=METRIC.find(m=>m[0]===mSel),svg=$('dots');const L=170,R=505,top=34,rh=40;
+  const vals=ARMS.filter(a=>rows[a[0]]).map(a=>rows[a[0]]);let lo,hi;
+  if(M[2]){lo=Math.max(0,Math.floor((Math.min(...vals.map(v=>v[1]))-.03)*10)/10);hi=1}else{lo=0;hi=Math.max(...vals.map(v=>v[2]))*1.1}
+  const x=v=>L+(v-lo)/(hi-lo)*(R-L);const H=top+vals.length*rh+28;svg.setAttribute('viewBox',`0 0 520 ${H}`);
+  let s=`<text x="${R}" y="14" text-anchor="end" font-size="12" fill="${css('--ink-3')}">${M[2]?'better →':'← better'}</text>`;
+  for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4;s+=`<line x1="${x(v)}" x2="${x(v)}" y1="${top-10}" y2="${H-22}" stroke="${css('--rule')}"/><text x="${x(v)}" y="${H-6}" text-anchor="middle" font-size="11" fill="${css('--ink-3')}">${M[2]?Math.round(v*100)+'%':v.toFixed(2)}</text>`}
+  let i=0;for(const a of ARMS){const v=rows[a[0]];if(!v)continue;const y=top+i*rh+8,c=css(a[2]);
+    s+=`<text x="0" y="${y+4}" font-size="13" fill="${css('--ink')}">${a[1]}</text><line x1="${x(v[1])}" x2="${x(v[2])}" y1="${y}" y2="${y}" stroke="${c}" stroke-width="3" stroke-linecap="round" opacity=".5"/><circle cx="${x(v[0])}" cy="${y}" r="6" fill="${c}"/>`;i++}
+  svg.innerHTML=s;
+  $('dotsCap').innerHTML=`<b>Figure 3.</b> ${M[1]}: ${M[3]}, on ${GROUND.find(g=>g[0]===gSel)[1].toLowerCase()}. Each dot is an average over the test situations and three training runs; the bar shows how far that average could plausibly move.`;
+}
+function drawEff(){const svg=$('eff');const d=[['SHAC',[.172,.172,.106],'--flame'],['PPO',[.811,.811,.759],'--b']];const L=60,R=505,x=v=>L+v/.9*(R-L);let s='';
+  for(let k=0;k<=4;k++){const v=k*.2;s+=`<line x1="${x(v)}" x2="${x(v)}" y1="6" y2="120" stroke="${css('--rule')}"/><text x="${x(v)}" y="138" font-size="11" text-anchor="middle" fill="${css('--ink-3')}">${k?v.toFixed(1)+' million':'0'}</text>`}
+  d.forEach((r,i)=>{r[1].forEach((v,j)=>{s+=`<rect x="${L}" y="${14+i*54+j*13}" width="${x(v)-L}" height="9" rx="2" fill="${css(r[2])}"/>`});s+=`<text x="0" y="${33+i*54}" font-size="13" fill="${css('--ink')}" font-weight="600">${r[0]}</text>`});
+  svg.innerHTML=s}
+const FSM=[['SIT','Sitting',10,20],['STAND_UP','Standing up',140,20],['STAND','Standing',270,20],['LOCOMOTE','Walking',400,20],['PROTECT','Catching a fall',270,110],['GROUNDED','Down, motors soft',400,110],['EMERGENCY','Power cut',140,110]];
+const STATE_FSM={2:'SIT',3:'STAND_UP',4:'STAND',5:'LOCOMOTE',6:'STAND',7:'SIT',8:'PROTECT',9:'PROTECT',10:'GROUNDED',11:'PROTECT',12:'EMERGENCY'};
+function drawFsm(live){const W=110,H=38;let s=`<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="${css('--ink-3')}"/></marker></defs>`;
+  const f=k=>FSM.find(n=>n[0]===k);const h=(a,b)=>{const A=f(a),B=f(b);s+=`<path d="M${A[2]+W} ${A[3]+H/2} L${B[2]-3} ${B[3]+H/2}" marker-end="url(#ar)"/>`};
+  h('SIT','STAND_UP');h('STAND_UP','STAND');h('STAND','LOCOMOTE');
+  s+=`<path d="M${f('LOCOMOTE')[2]+30} ${20+H} C ${f('LOCOMOTE')[2]+30} 90, ${f('PROTECT')[2]+70} 70, ${f('PROTECT')[2]+70} ${110-3}" marker-end="url(#ar)"/>`;h('PROTECT','GROUNDED');
+  s+=`<path d="M${f('PROTECT')[2]} ${110+H/2} L${f('EMERGENCY')[2]+W+3} ${110+H/2}" marker-end="url(#ar)"/>`;
+  s+=`<text x="10" y="186" font-size="11" fill="${css('--ink-3')}">A stumble that is caught in time goes back from “catching a fall” to walking.</text>`;
+  for(const n of FSM)s+=`<g class="n ${n[0]===live?'live':''}"><rect x="${n[2]}" y="${n[3]}" width="${W}" height="${H}" rx="8"/><text x="${n[2]+W/2}" y="${n[3]+24}" text-anchor="middle">${n[1]}</text></g>`;
+  $('fsm').innerHTML=s}
+let lastFsm=null;
+function drawFigs(){drawDots();drawEff();drawFsm(lastFsm)}
+drawFigs();
+const retheme=()=>setTimeout(()=>{drawFigs();themeStage()},60);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',retheme);
+new MutationObserver(retheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ================= the evaluation ground (story) ================= */
+const tileOf=(x,y)=>{const c=Math.floor((x+32)/16),r=Math.floor((y+32)/16);return c<0||c>3||r<0||r>3?-1:r*4+c};
+const tileCenter=i=>[-24+16*(i%4),-24+16*Math.floor(i/4)];
+const SPOTS=[
+  {k:'flat',n:'Flat floor',x:-14,y:-8},
+  {k:'ramp10',n:'Ramp 10°, uphill',x:3,y:-8,slope:true},
+  {k:'ramp20',n:'Ramp 20°, uphill',x:3,y:24,slope:true},
+  {k:'blocks4',n:'Blocks up to 4 cm',x:-30,y:-8},
+  {k:'blocks8',n:'Blocks up to 8 cm',x:-30,y:24},
+  {k:'stairs5',n:'Stairs with 5 cm steps, up',x:24,y:-24},
+  {k:'stairs10',n:'Stairs with 10 cm steps, up',x:18,y:-8},
+  {k:'stairs10d',n:'Stairs with 10 cm steps, down',x:24,y:-8},
+];
+const BRAINS={
+  rules:{n:'Rules only',d:'The hand-written force rule, without a network.',pol:''},
+  shac:{n:'Learned forces, SHAC',d:'The thesis controller: the rules plus a network trained with SHAC.',pol:'/fia/policies/shac_hybrid_s0.ptk'},
+  ppo:{n:'Learned forces, PPO',d:'The same structure with a network trained by PPO.',pol:'/fia/policies/ppo_hybrid_s0.ptk'},
+  mpc:{n:'Planner (MPC)',d:'A tuned model-predictive controller plans the forces.',pol:'',mpc:1},
+};
+const SCENES={
+  intro:{t:'Free walk',spot:'flat',brains:['shac'],v:.5,w:0},
+  stand:{t:'Standing',spot:'flat',brains:['shac'],v:0,w:0},
+  push:{t:'Shove it',spot:'flat',brains:['shac'],v:0,w:0,hint:'Drag the body sideways, then let go'},
+  'duel-rules':{t:'Rules and learned forces',spot:'flat',brains:['rules','shac'],v:.5,w:.8},
+  'duel-ppo':{t:'SHAC and PPO',spot:'flat',brains:['ppo','shac'],v:.5,w:.8},
+  stairs:{t:'Stairs',spot:'stairs10',brains:['shac'],v:.4,w:0},
+  'duel-mpc':{t:'Learned forces and planner',spot:'flat',brains:['mpc','shac'],v:.5,w:.6},
+  safety:{t:'Safety',spot:'flat',brains:['shac'],v:0,w:0,hint:'Press “Shove 600 N”, or drag hard',hard:true},
+};
+const STATE_TEXT={0:['Starting','warn'],1:['Getting its bearings','warn'],2:['Sitting','warn'],3:['Standing up','warn'],4:['Standing','ok'],5:['Walking','ok'],6:['Stopping','warn'],7:['Sitting down','warn'],8:['Catching a stumble','warn'],9:['Catching a fall','bad'],10:['Down, motors soft','bad'],11:['Degraded','warn'],12:['Power cut','bad']};
+
+/* ================= the Proving Grounds ================= */
+// Beacons and quests are placed from the generated valley's landmarks.
+let BEACONS=[],REGIONS=[];
+function placeWorld(L){
+  const head=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0]);
+  BEACONS=[
+    {k:'camp',n:'The Camp',p:L.camp,yaw:0},
+    {k:'meadow',n:'Meadow Foot',p:L.meadowFoot,yaw:head(L.meadowFoot,L.meadowTop)},
+    {k:'stairs',n:'Foot of the Stair',p:L.stairsFoot,yaw:head(L.stairsFoot,L.stairsTop)},
+    {k:'steep',n:'Foot of the Steep',p:L.steepFoot,yaw:head(L.steepFoot,L.steepTop)},
+    {k:'ramp',n:'Foot of the Long Ramp',p:L.rampFoot,yaw:Math.PI/2},
+    {k:'court',n:"The Planner's Court",p:L.court,yaw:0},
+    {k:'ruin',n:'The Ruin',p:L.ruin,yaw:Math.PI},
+  ];
+  REGIONS=[['The Camp',L.camp,6],['The Meadow Hill',L.meadowTop,7],['The Scree',L.scree,6],['The Stone Stair',[L.stairsFoot[0],(L.stairsFoot[1]+L.stairsTop[1])/2],4],['The Steep',[L.steepFoot[0],(L.steepFoot[1]+L.steepTop[1])/2],5],
+    ['The Long Ramp',[-22,4],5],["The Planner's Court",L.court,6],['The North Wood',[1,20],8],['The South Wood',[21,-21],7],['The Ruin',L.ruin,7]];
+}
+const PAGES={
+  eyes:['No eyes','Fiammetta has no camera. Everything it knows comes from twelve joint encoders, the torque each motor reports, and an inertial sensor in the trunk. In this valley it cannot see the rocks or the steps; it meets them with its feet.'],
+  estimate:['Knowing your own speed','The robot cannot measure its own speed. A Kalman filter combines the inertial sensor with the legs that are planted on the ground and estimates it. The controller acts on that estimate only, never on the true value, just as on the real robot.'],
+  forces:['Where the feet push','Every 2 ms the controller chooses a force for each foot on the ground. A force that leans too far slips, so each must stay inside a friction cone. When a shove arrives, it is these forces that hold the trunk in place.'],
+  rules:['The rules','Before any learning, the forces came from a hand-written rule inside a whole-body controller after Kim and colleagues (2019). It walks, it is predictable, and over the thesis test it fell in about one run in eleven.'],
+  learning:['Teaching through a simpler world','The network was trained with SHAC, which follows the derivative of the score. The derivative comes from a single rigid block pushed by four forces; the values from the full simulator. It reached PPO’s final score after 0.11 to 0.17 million simulated steps. PPO needed 0.76 to 0.81 million.'],
+  steep:['The steep face','On a 20° incline the rules alone fell in about one run in seven of the thesis test. With the learned forces, the robot stayed up in 99.6 % of runs. The network did not learn a new gait. It learned how hard to push.'],
+  stairs:['Blind stairs','The robot cannot see the steps and must feel them. On 10 cm stairs going up, the learned forces stayed up in 72 % of the thesis runs and the rules in 62 %. A network that drives the joints directly survived more often, mostly by barely moving.'],
+  planner:['The rival','A tuned model-predictive planner is the honest opponent. In staying up and following speed, it and the learned forces cannot be told apart. But the network costs 15 µs and the planner up to 2.2 ms, longer than a whole control cycle. On this device you measured: {cost}.'],
+  guardian:['The guardian','Around everything sits a supervisor. When it sees a fall it folds the legs in and lets the robot down softly instead of fighting with full motor power. In simulation it handled every fault scenario written for it, from dead motors to a frozen sensor.'],
+  floor:['The real floor','Everything you walked here ran the robot’s own program, unchanged. A real floor pushes back in ways no simulator does: friction that changes underfoot, motors that warm as they work, a body never quite like its model. What will the learned forces make of that?'],
+};
+const QUESTS=[
+  {k:'wake',t:'Wake up',d:'Wait for Fiammetta to stand up at the camp.',where:'camp',done:s=>s.state===4||s.state===5,page:'eyes'},
+  {k:'walk',t:'First steps',d:'Walk to the golden ring ahead of you. Push the stick up, or press W.',where:'camp',goal:'firstStep',page:'estimate'},
+  {k:'shove',t:'Hold your ground',d:'Stand still and shove the robot: drag its body sideways, or press Shove. Keep it on its feet for three seconds.',where:'camp',custom:'shove',page:'forces'},
+  {k:'meadow',t:'The meadow hill',d:'Travel to Meadow Foot and climb to the ring on the hilltop, on the rules alone.',where:'meadow',goal:'meadowTop',brain:'rules',page:'rules'},
+  {k:'train',t:'Back at camp',d:'Return to the camp and step into the ring by the tents. There the network is fitted.',where:'camp',goal:'workshopMark',page:'learning',unlock:['shac','ppo']},
+  {k:'steep',t:'The steep face',d:'Travel to the Foot of the Steep and climb the grass face to the ring above, with the learned forces.',where:'steep',goal:'steepTop',brain:'shac',page:'steep'},
+  {k:'stairs',t:'The stone stair',d:'Travel to the Foot of the Stair and climb to the ring at the top. Use the sidestep to stay on the stair.',where:'stairs',goal:'stairsTop',page:'stairs'},
+  {k:'rival',t:'The rival',d:"Travel to the Planner's Court and cross it to the ring with the planner equipped. Watch its time per cycle.",where:'court',goal:'courtGoal',brain:'mpc',page:'planner',unlock:['mpc'],unlockFirst:true},
+  {k:'guardian',t:'The guardian',d:'At the Ruin, stand still and take the hardest shove (Shove 600 N). Let the supervisor do its work.',where:'ruin',custom:'fall',page:'guardian'},
+  {k:'floor',t:'The real floor',d:'Open the journal and read the last page. Then the valley is yours.',where:null,custom:'end',page:'floor'},
+];
+let W={q:store.get('q',0),unlocked:store.get('unlocked',['rules']),pages:store.get('pages',[]),beacons:store.get('beacons',['camp']),regions:store.get('regions',[]),
+  params:Object.assign({},window.FiaWorld?FiaWorld.DEFAULTS:{},store.get('params',{})),
+  brain:'rules',last:'camp',odo:0,steps:0,falls:store.get('falls',0),cost:{},shoveAt:0,world:null,visited:new Uint8Array(64*64)};
+const saveW=()=>{store.set('q',W.q);store.set('unlocked',W.unlocked);store.set('pages',W.pages);store.set('beacons',W.beacons);store.set('regions',W.regions);store.set('falls',W.falls);store.set('params',W.params)};
+
+/* ================= runtime state ================= */
+let M=null,G=null,loaded=false,robots=[],mode='story';
+const cur={scene:'intro',spot:{...SPOTS[0]},brains:['shac'],hard:false,relay:null};
+const cmd={v:0,vy:0,w:0,gait:1},ramp={v:0,vy:0,w:0};
+
+/* ================= loading ================= */
+async function fetchData(onp){
+  const man=await (await fetch('data/manifest.json')).json();const total=man.files.reduce((a,f)=>a+f.parts.length,0);let done=0;
+  for(const f of man.files){const bufs=[];
+    for(const p of f.parts){const r=await fetch('data/'+p);if(!r.ok)throw new Error('a download failed ('+r.status+')');
+      if(man.encoding==='raw'){bufs.push(new Uint8Array(await r.arrayBuffer()));onp(++done/total);continue}
+      const b=atob((await r.text()).trim());const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);bufs.push(u);onp(++done/total)}
+    const raw=await new Response(new Blob(bufs).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+    M.FS.mkdirTree(f.path.slice(0,f.path.lastIndexOf('/')));M.FS.writeFile(f.path,new Uint8Array(raw))}
+}
+let afterLoad=null;
+async function wake(){
+  if(loaded||$('wake').disabled)return;$('wake').disabled=true;$('prog').hidden=false;$('loadmsg').textContent='Starting…';
+  try{
+    if(typeof loadFia!=='function')throw new Error('the simulator module did not load');
+    M=await loadFia({locateFile:p=>p});$('loadmsg').textContent='Downloading the robot and the test ground…';
+    await fetchData(p=>$('progbar').style.width=Math.round(p*100)+'%');
+    $('loadmsg').textContent='Assembling the robot…';await new Promise(r=>setTimeout(r,20));
+    initGL();loaded=true;$('poster').hidden=true;['tl','tr','bl','br','strip'].forEach(i=>$(i).hidden=false);
+    if(afterLoad){const f=afterLoad;afterLoad=null;await f()}else setScene(cur.scene);
+    requestAnimationFrame(frame);
+  }catch(e){$('loadmsg').textContent='It did not start: '+e.message;$('wake').disabled=false;console.error(e)}
+}
+$('wake').onclick=wake;
+document.querySelectorAll('[data-scene]').forEach(b=>b.onclick=()=>{cur.scene=b.dataset.scene;document.querySelectorAll('[data-scene]').forEach(x=>x.classList.toggle('on',x===b));
+  if(innerWidth<=980)scrollTo({top:0,behavior:'smooth'});if(!loaded){wake();return}if(mode==='world')leaveWorld(true);setScene(cur.scene)});
+$('enterWorld').onclick=$('enterWorld2').onclick=()=>enterWorld();
+
+/* ================= sessions ================= */
+const INIT_T=['string','string','number','number','number','number','number','number','number','number','number'];
+const tel=id=>{M._fia_select(id);return new Float64Array(M.HEAPF64.buffer,M._fia_telemetry(),128)};
+const poses=id=>{M._fia_select(id);return new Float64Array(M.HEAPF64.buffer,M._fia_poses(),64*12)};
+const yawOf=T=>Math.atan2(2*(T[15]*T[18]+T[16]*T[17]),1-2*(T[17]*T[17]+T[18]*T[18]));
+function setScene(name){const S=SCENES[name];cur.spot={...SPOTS.find(s=>s.k===S.spot)};cur.brains=S.brains.slice();cur.hard=!!S.hard;cmd.v=S.v;cmd.vy=0;cmd.w=S.w;setJoy();
+  $('cScene').textContent=S.t;showHint(S.hint);setShove();start()}
+function setShove(){$('bShove').textContent=cur.hard?'Shove 600 N':'Shove 300 N';$('bShove').classList.toggle('hot',cur.hard)}
+function showHint(t){$('hint').textContent=t||'';$('hint').hidden=!t}
+function initSession(slot,brain,x,y,slope,yaw){const B=BRAINS[brain];M._fia_select(slot);
+  const rc=M.ccall('fia_init','number',INIT_T,['/fia/scene.mjb',B.pol,B.mpc||0,x,y,2,0,0,7+slot,slope?1:0,yaw||0]);
+  if(rc!==0){toast('The controller refused to start',M.ccall('fia_error','string',[],[]));return null}
+  M._fia_step(1,0,0,0,cmd.gait,1,0);
+  return {id:slot,brain,done:null,se:0,sw:0,n:0,us:0,gait:[],hist:[],fellAt:0,knee:[],grip:[],lastContact:[0,0,0,0]}}
+function start(){
+  if(!M)return;hideToast();closePanels();
+  for(let id=0;id<3;id++){M._fia_select(id);M._fia_free()}
+  M._fia_terrain_use(mode==='world'?1:0);useGround(mode);
+  robots=[];const s=cur.spot,n=cur.brains.length;
+  cur.relay=(n===2&&LOWMEM)?{idx:0,results:[]}:null;
+  if(cur.relay){const r=initSession(0,cur.brains[0],s.x,s.y,s.slope,s.yaw);if(r){r.slotLabel=0;robots.push(r)}}
+  else cur.brains.forEach((b,i)=>{const r=initSession(i,b,s.x,s.y+(n===2?(i===0?-.9:.9):0),s.slope,s.yaw);if(r){r.slotLabel=i;robots.push(r)}});
+  ramp.v=ramp.vy=ramp.w=0;if(robots.length){buildTerrain(s.x,s.y,true);buildRobots()}tallyKey='';
+}
+function nextRelay(){const rl=cur.relay;const prev=robots[0];rl.results[rl.idx]=prev;rl.idx++;
+  M._fia_select(0);M._fia_free();const s=cur.spot;const r=initSession(0,cur.brains[rl.idx],s.x,s.y,s.slope,s.yaw);if(!r)return;r.slotLabel=rl.idx;robots=[r];ramp.v=ramp.vy=ramp.w=0;buildRobots();tallyKey=''}
+
+/* ================= toasts ================= */
+function toast(h,t,btns){$('toastH').textContent=h||'';$('toastH').hidden=!h;$('toastText').textContent=t||'';const b=$('toastBtns');b.innerHTML='';
+  (btns||[['Start again',()=>{mode==='world'?respawn():start()},true]]).forEach(([l,f,hot])=>{const e=document.createElement('button');e.className='sbtn'+(hot?' hot':'');e.textContent=l;e.onclick=()=>{hideToast();f()};b.append(e)});$('toast').hidden=false}
+function hideToast(){$('toast').hidden=true}
+const toastOpen=()=>!$('toast').hidden;
+
+/* ================= panels ================= */
+const PANELS=[['pBrain','bBrain'],['pMap','bMap'],['pJournal','bJournal'],['pWorld','bWorld']];
+function closePanels(){PANELS.forEach(([p,b])=>{$(p).hidden=true;$(b).setAttribute('aria-expanded','false')})}
+function togglePanel(p,b,fill){const o=$(p).hidden;closePanels();if(o){fill();$(p).hidden=false;$(b).setAttribute('aria-expanded','true')}}
+function reopen(p,b,fill){fill();$(p).hidden=false;$(b).setAttribute('aria-expanded','true')}
+$('bBrain').onclick=()=>togglePanel('pBrain','bBrain',fillBrains);
+$('bMap').onclick=()=>togglePanel('pMap','bMap',fillMap);
+$('bJournal').onclick=()=>togglePanel('pJournal','bJournal',fillJournal);
+$('bWorld').onclick=()=>togglePanel('pWorld','bWorld',fillWorldPanel);
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closePanels);
+function fillBrains(){const el=$('brains');el.innerHTML='';
+  if(mode==='world'){
+    for(const [k,B] of Object.entries(BRAINS)){const lock=!W.unlocked.includes(k);const b=document.createElement('button');b.setAttribute('aria-pressed',k===W.brain);if(lock)b.setAttribute('aria-disabled','true');
+      b.innerHTML=`<b>${lock?'Locked':B.n}</b><span>${lock?(k==='mpc'?'Meet the rival to unlock.':'Fitted at the camp.'):B.d}</span>`;
+      b.onclick=()=>{if(lock)return;W.brain=k;closePanels();equip()};el.append(b)}
+    return}
+  const duel=cur.brains.length===2;
+  const head=document.createElement('div');head.style.cssText='display:flex;gap:4px;margin-bottom:4px;flex-wrap:wrap';
+  head.innerHTML=`<button class="sbtn" aria-pressed="${!duel}">One robot</button><button class="sbtn" aria-pressed="${duel}">Two, compared</button>`;
+  head.children[0].onclick=()=>{cur.brains=[cur.brains[cur.brains.length-1]];$('cScene').textContent='Free drive';start();reopen('pBrain','bBrain',fillBrains)};
+  head.children[1].onclick=()=>{if(!duel)cur.brains=[cur.brains[0]==='rules'?'ppo':'rules',cur.brains[0]==='rules'?'shac':cur.brains[0]];$('cScene').textContent='Compared';start();reopen('pBrain','bBrain',fillBrains)};
+  el.append(head);
+  if(duel&&LOWMEM){const t=document.createElement('span');t.style.color='var(--ink-2)';t.textContent='On this device the two take turns on the same course.';el.append(t)}
+  cur.brains.forEach((sel,slot)=>{if(duel){const t=document.createElement('div');t.className='slot';t.innerHTML=`<i class="dot" style="background:${slot?css('--flame'):css('--b')}"></i>${slot?'Orange marker':'Blue marker'}`;el.append(t)}
+    for(const [k,B] of Object.entries(BRAINS)){const b=document.createElement('button');b.setAttribute('aria-pressed',k===sel);b.innerHTML=`<b>${B.n}</b><span>${B.d}</span>`;
+      b.onclick=()=>{cur.brains[slot]=k;$('cScene').textContent=duel?'Compared':'Free drive';start();reopen('pBrain','bBrain',fillBrains)};el.append(b)}});
+}
+const toPx=(x,y)=>[(x+32)/64*320,(32-y)/64*320];
+const mapCache={};
+function fillMap(){const c=$('map'),g=c.getContext('2d');const world=mode==='world';
+  if(!mapCache[mode])mapCache[mode]=renderMap();g.putImageData(mapCache[mode],0,0);
+  $('mapTitle').textContent=world?'The valley':'Test ground';
+  if(world){// unexplored ground stays in shadow
+    const fog=g.createImageData(320,320);for(let j=0;j<320;j++)for(let i=0;i<320;i++){const v=W.visited[Math.floor((319-j)/5)*64+Math.floor(i/5)];const k=4*(j*320+i);fog.data[k]=18;fog.data[k+1]=24;fog.data[k+2]=22;fog.data[k+3]=v?0:170}
+    const tmpc=document.createElement('canvas');tmpc.width=tmpc.height=320;tmpc.getContext('2d').putImageData(fog,0,0);g.drawImage(tmpc,0,0)}
+  const pts=world?BEACONS.filter(b=>W.beacons.includes(b.k)||questBeacon()===b.k).map(b=>({k:b.k,n:b.n,x:b.p[0],y:b.p[1]})):SPOTS;
+  pts.forEach(s=>{const [px,py]=toPx(s.x,s.y);const here=world?s.k===W.last:s.k===cur.spot.k;const q=world&&questBeacon()===s.k;
+    g.beginPath();g.arc(px,py,here||q?7:5,0,7);g.fillStyle=q?css('--gold'):here?css('--flame'):'#fff';g.fill();g.lineWidth=2;g.strokeStyle='#1a1e22';g.stroke()});
+  if(robots[0]){const T=tel(robots[0].id);const [px,py]=toPx(T[9],T[10]);const yw=yawOf(T);g.save();g.translate(px,py);g.rotate(-yw);g.beginPath();g.moveTo(7,0);g.lineTo(-4,4);g.lineTo(-4,-4);g.closePath();g.fillStyle=css('--flame');g.fill();g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke();g.restore()}
+  const list=$('mapList');list.innerHTML='';
+  if(world){const h=document.createElement('span');h.style.color='var(--ink-2)';h.textContent=`Places found: ${W.regions.length} of ${REGIONS.length}. Travel to a beacon:`;list.append(h)}
+  pts.forEach(s=>{const b=document.createElement('button');b.setAttribute('aria-pressed',world?s.k===W.last:s.k===cur.spot.k);
+    b.innerHTML=`<b>${s.n}${world&&questBeacon()===s.k?' · quest':''}</b>`;b.onclick=()=>pick(s);list.append(b)});
+  c.onclick=e=>{const r=c.getBoundingClientRect();const mx=(e.clientX-r.left)/r.width*320,my=(e.clientY-r.top)/r.height*320;let best=null,bd=1e9;
+    pts.forEach(s=>{const [px,py]=toPx(s.x,s.y);const d=(px-mx)**2+(py-my)**2;if(d<bd){bd=d;best=s}});if(best&&bd<1600)pick(best)};
+  function pick(s){if(world){travel(s.k)}else{cur.spot={...s};$('cScene').textContent=s.n;start()}}
+}
+function renderMap(){
+  const h=G.hf,nr=h.nr,nc=h.nc,d=h.data;const img=new ImageData(320,320),st=nc/320,at=(r,c)=>d[Math.max(0,Math.min(nr-1,r))*nc+Math.max(0,Math.min(nc-1,c))];
+  const mat=mode==='world'&&W.world?W.world.mat:null;
+  for(let py=0;py<320;py++)for(let px=0;px<320;px++){const r=Math.floor((319-py)*st),c=Math.floor(px*st),hv=at(r,c);
+    const sh=Math.max(0,Math.min(1.25,.75+(at(r,c-4)-at(r,c+4))*25+(at(r+4,c)-at(r-4,c))*25));const i=4*(py*320+px);
+    let col=[150,156,152];if(mat){col=MATCOL[mat[r*nc+c]].map(v=>v*255)}else col=[96+130*Math.min(1,sh*.8+(hv-.5)*.5),102+128*Math.min(1,sh*.8),100+124*Math.min(1,sh*.8)];
+    const k=mat?sh:1;img.data[i]=Math.min(255,col[0]*k);img.data[i+1]=Math.min(255,col[1]*k);img.data[i+2]=Math.min(255,col[2]*k);img.data[i+3]=255}
+  return img}
+function fillJournal(){const el=$('journal');const order=QUESTS.map(q=>q.page);
+  el.innerHTML=`<span style="color:var(--ink-2)">${W.pages.length} of ${order.length} pages written.</span>`+order.map(k=>{const got=W.pages.includes(k);const P=PAGES[k];
+    return `<article><b>${got?P[0]:'Unwritten page'}</b><p${got?'':' class="locked"'}>${got?P[1].replace('{cost}',costText()):'Complete a quest to write this page.'}</p></article>`}).join('')}
+function costText(){const c=W.cost;const f=k=>c[k]?(c[k]/1000).toFixed(2)+' ms':'not yet measured';return `learned forces ${f('shac')} per 2 ms cycle, planner ${f('mpc')}`}
+const WP=[['wHills','hills',v=>(+v).toFixed(1)+'×'],['wRocks','rocks',v=>(+v).toFixed(1)+'×'],['wForest','forest',v=>(+v).toFixed(1)+'×'],['wRiser','riser',v=>Math.round(v*100)+' cm'],['wSteep','steep',v=>v+'°']];
+function fillWorldPanel(){$('wSeed').value=W.params.seed;for(const [id,k,f] of WP){$(id).value=W.params[k];$('o'+id.slice(1)).textContent=f(W.params[k]);$(id).oninput=()=>{$('o'+id.slice(1)).textContent=f($(id).value);worldWarn()}}worldWarn()}
+function readWorldPanel(){const p={seed:Math.max(1,Math.round(+$('wSeed').value||1))};for(const [id,k] of WP)p[k]=+$(id).value;return p}
+function worldWarn(){const p=readWorldPanel(),T=FiaWorld.TRAINED,w=[];if(p.steep>T.steep)w.push(`Steep face ${p.steep}° is steeper than any slope in training.`);if(p.riser>T.riser+1e-9)w.push(`${Math.round(p.riser*100)} cm steps are taller than any in training.`);if(.06*p.rocks>T.block+1e-9)w.push(`Scree stones up to ${Math.round(6*p.rocks)} cm are taller than the training blocks.`);
+  $('wWarn').textContent=w.join(' ');$('wWarn').hidden=!w.length}
+$('wDice').onclick=()=>{$('wSeed').value=1+Math.floor(Math.random()*99999)};
+$('wReset').onclick=()=>{W.params=Object.assign({},FiaWorld.DEFAULTS);fillWorldPanel()};
+$('wGo').onclick=async()=>{W.params=readWorldPanel();saveW();closePanels();await makeWorld();travel(W.last,true);showDecor(true)};
+
+/* ================= driving ================= */
+const VMAX=1.0,VBACK=.4,VYMAX=.5,WMAX=1.2;
+function setJoy(){const j=$('joy'),rr=j.clientWidth/2-19;const kx=-cmd.vy/VYMAX*rr,ky=-(cmd.v>=0?cmd.v/VMAX:cmd.v/VBACK)*rr;
+  $('knob').style.transform=`translate(${kx}px,${ky}px)`;const t=$('turn'),tr=t.clientWidth/2-20;$('tknob').style.transform=`translateX(${-cmd.w/WMAX*tr}px)`;
+  $('jV').textContent=cmd.v.toFixed(2)+' m/s';$('jS').textContent='side '+(-cmd.vy).toFixed(2)+' m/s';$('jW').textContent='turn '+cmd.w.toFixed(2)+' rad/s';
+  j.setAttribute('aria-valuetext',`forward ${cmd.v.toFixed(2)}, sideways ${cmd.vy.toFixed(2)} metres per second`);t.setAttribute('aria-valuetext',`turning ${cmd.w.toFixed(2)} radians per second`)}
+function dragPad(el,fn){let drag=false;el.addEventListener('pointerdown',e=>{drag=true;el.setPointerCapture(e.pointerId);fn(e)});el.addEventListener('pointermove',e=>{if(drag)fn(e)});
+  el.addEventListener('pointerup',()=>drag=false);el.addEventListener('pointercancel',()=>drag=false)}
+dragPad($('joy'),e=>{const b=$('joy').getBoundingClientRect(),rr=b.width/2-19;let dx=e.clientX-b.left-b.width/2,dy=e.clientY-b.top-b.height/2;const d=Math.hypot(dx,dy);if(d>rr){dx*=rr/d;dy*=rr/d}
+  let vy=Math.round(-dx/rr*VYMAX*20)/20,fy=-dy/rr,v=Math.round((fy>=0?fy*VMAX:fy*VBACK)*20)/20;if(Math.abs(vy)<.06)vy=0;if(Math.abs(v)<.05)v=0;
+  if(cmd.gait===2){v=Math.min(v,.3);vy=Math.max(-.2,Math.min(.2,vy))}cmd.v=v;cmd.vy=vy;setJoy();if(mode==='story')showHint('')});
+dragPad($('turn'),e=>{const b=$('turn').getBoundingClientRect(),rr=b.width/2-20;let dx=Math.max(-rr,Math.min(rr,e.clientX-b.left-b.width/2));let w=Math.round(-dx/rr*WMAX*20)/20;if(Math.abs(w)<.1)w=0;cmd.w=w;setJoy()});
+$('joy').addEventListener('dblclick',()=>{cmd.v=0;cmd.vy=0;setJoy()});$('turn').addEventListener('dblclick',()=>{cmd.w=0;setJoy()});
+addEventListener('keydown',e=>{if(!loaded||e.target.closest('input,select,textarea'))return;const r=$('stage').getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)return;
+  const k=e.key.toLowerCase(),vmax=cmd.gait===2?.3:VMAX;let hit=true;
+  if(k==='w'||k==='arrowup')cmd.v=Math.min(vmax,+(cmd.v+.1).toFixed(2));else if(k==='s'||k==='arrowdown')cmd.v=Math.max(-VBACK,+(cmd.v-.1).toFixed(2));
+  else if(k==='a')cmd.vy=Math.min(VYMAX,+(cmd.vy+.1).toFixed(2));else if(k==='d')cmd.vy=Math.max(-VYMAX,+(cmd.vy-.1).toFixed(2));
+  else if(k==='q'||k==='arrowleft')cmd.w=Math.min(WMAX,+(cmd.w+.15).toFixed(2));else if(k==='e'||k==='arrowright')cmd.w=Math.max(-WMAX,+(cmd.w-.15).toFixed(2));
+  else if(k===' '&&(e.target===document.body||e.target===$('joy')||e.target===$('turn'))){cmd.v=cmd.vy=cmd.w=0}else if(k==='escape'){closePanels();hit=false}else hit=false;
+  if(hit){e.preventDefault();setJoy()}});
+let padSeen=false;
+function pollPad(){let pads=[];try{pads=navigator.getGamepads?navigator.getGamepads():[]}catch(e){return}const p=pads&&[...pads].find(x=>x&&x.connected);if(!p)return;
+  const dz=v=>Math.abs(v)<.15?0:v;const lx=dz(p.axes[0]||0),ly=dz(p.axes[1]||0),rx=dz(p.axes[2]||0);
+  if(lx||ly||rx||padSeen){padSeen=!!(lx||ly||rx);cmd.v=ly<0?-ly*VMAX:-ly*VBACK;cmd.vy=-lx*VYMAX;cmd.w=-rx*WMAX;if(cmd.gait===2)cmd.v=Math.min(cmd.v,.3);setJoy()}
+  if(p.buttons[0]&&p.buttons[0].pressed&&!pollPad.b0)$('bShove').click();pollPad.b0=p.buttons[0]&&p.buttons[0].pressed}
+$('gTrot').onclick=()=>{cmd.gait=1;$('gTrot').setAttribute('aria-pressed','true');$('gCrawl').setAttribute('aria-pressed','false')};
+$('gCrawl').onclick=()=>{cmd.gait=2;cmd.v=Math.min(cmd.v,.3);cmd.vy=Math.max(-.2,Math.min(.2,cmd.vy));setJoy();$('gCrawl').setAttribute('aria-pressed','true');$('gTrot').setAttribute('aria-pressed','false')};
+$('bShove').onclick=()=>{if(!loaded)return;const f=cur.hard?600:300,s=Math.random()<.5?-1:1;
+  for(const r of robots){const T=tel(r.id);const yaw=yawOf(T);M._fia_select(r.id);M._fia_push(-Math.sin(yaw)*f*s,Math.cos(yaw)*f*s,0,.1)}
+  W.shoveAt=performance.now();if(mode==='story')showHint('')};
+$('bReset').onclick=()=>start();
+
+/* ================= the generated valley ================= */
+async function makeWorld(){
+  $('gen').hidden=false;$('genmsg').textContent=`Seed ${W.params.seed}`;$('genbar').style.width='0%';await new Promise(r=>setTimeout(r,30));
+  const h=G.hfStory,n=h.nr*h.nc;
+  const ptr=M._fia_terrain_buffer(n);const view=new Float32Array(M.HEAPF32.buffer,ptr,n);
+  const res=await FiaWorld.generate(W.params,{nr:h.nr,nc:h.nc,sx:h.sz[0],sy:h.sz[1],sz:h.sz[2],oz:h.oz,ox:h.ox,oy:h.oy},view,p=>$('genbar').style.width=Math.round(p*100)+'%');
+  W.world=res;placeWorld(res.landmarks);
+  G.hfWorld={...h,data:new Float32Array(M.HEAPF32.buffer,ptr,n).slice()};
+  W.visited=new Uint8Array(64*64);mapCache.world=null;
+  buildDecor();$('gen').hidden=true;
+  if(res.warnings.length)banner('Outside the training range',res.warnings[0]);
+}
+async function enterWorld(){
+  mode='world';document.body.classList.add('inworld');$('stage').classList.add('world');closePanels();hideToast();showHint('');
+  $('quest').hidden=false;$('sheet').hidden=false;
+  if(!loaded){afterLoad=()=>worldStart();wake();return}
+  await worldStart();
+}
+async function worldStart(){
+  if(!W.world)await makeWorld();
+  W.brain=W.unlocked.includes(W.brain)?W.brain:'rules';
+  const q=QUESTS[W.q];if(q&&q.where&&!W.beacons.includes(q.where))W.beacons.push(q.where);
+  travel(W.q<=2?'camp':(W.last||'camp'),true);showDecor(true);
+}
+function leaveWorld(quiet){mode='story';document.body.classList.remove('inworld');$('stage').classList.remove('world');closePanels();hideToast();clearWorldMarks();showDecor(false);
+  $('quest').hidden=true;$('sheet').hidden=true;cur.hard=false;if(!quiet)setScene('intro')}
+$('bExit').onclick=()=>leaveWorld(false);
+function questBeacon(){const q=QUESTS[W.q];return q&&q.where}
+function travel(k,quiet){const b=BEACONS.find(x=>x.k===k)||BEACONS[0];W.last=b.k;if(!W.beacons.includes(b.k))W.beacons.push(b.k);saveW();
+  closePanels();hideToast();cur.spot={k:b.k,n:b.n,x:b.p[0],y:b.p[1],slope:true,yaw:b.yaw};cur.brains=[W.brain];cur.hard=b.k==='ruin';setShove();cmd.v=cmd.vy=cmd.w=0;setJoy();
+  start();buildWorldMarks();if(!quiet)banner('Arrived',b.n);renderQuest()}
+function respawn(){travel(W.last,true)}
+function equip(){travel(W.last,true);banner('Equipped',BRAINS[W.brain].n)}
+let bannerTimer=0;
+function banner(k,t){$('bannerK').textContent=k;$('bannerT').textContent=t;$('banner').hidden=false;$('banner').style.opacity=1;clearTimeout(bannerTimer);bannerTimer=setTimeout(()=>{$('banner').style.opacity=0;setTimeout(()=>$('banner').hidden=true,500)},2800)}
+function renderQuest(){const q=QUESTS[W.q];const el=$('quest');
+  if(!q){el.innerHTML=`<span class="qk">ALL QUESTS COMPLETE</span><b>The valley is yours</b><span class="qd">Every journal page is written. Shape a new valley under World, swap controllers, and try the scree and the stair with each.</span><span class="qp">${W.regions.length} of ${REGIONS.length} places found</span>`;return}
+  const need=q.brain&&W.brain!==q.brain&&(W.unlocked.includes(q.brain)||q.unlockFirst);
+  const away=q.where&&W.last!==q.where;const B=BEACONS.find(b=>b.k===q.where);
+  el.innerHTML=`<span class="qk">QUEST ${W.q+1} OF ${QUESTS.length}</span><b>${q.t}</b><span class="qd">${q.d}</span>`+
+    (away?`<button class="sbtn hot" id="qGo">Travel to ${B?B.n:''}</button>`:'')+
+    (!away&&need?`<button class="sbtn hot" id="qEq">Equip ${BRAINS[q.brain].n}</button>`:'')+
+    `<span class="qp" id="qProg"></span>`;
+  const go=$('qGo');if(go)go.onclick=()=>travel(q.where);
+  const eq=$('qEq');if(eq)eq.onclick=()=>{if(q.unlockFirst&&!W.unlocked.includes(q.brain)){W.unlocked.push(q.brain);saveW()}W.brain=q.brain;equip();renderQuest()};
+}
+function completeQuest(){const q=QUESTS[W.q];if(!q)return;
+  if(!W.pages.includes(q.page))W.pages.push(q.page);(q.unlock||[]).forEach(u=>{if(!W.unlocked.includes(u))W.unlocked.push(u)});
+  W.q=Math.min(QUESTS.length,W.q+1);const nq=QUESTS[W.q];if(nq&&nq.where&&!W.beacons.includes(nq.where))W.beacons.push(nq.where);saveW();
+  const P=PAGES[q.page];const unl=(q.unlock||[]).filter(()=>!q.unlockFirst).map(u=>BRAINS[u].n);
+  toast('Quest complete: '+q.t,`New journal page, “${P[0]}”.${unl.length?' Unlocked: '+unl.join(' and ')+'.':''}`,[['Read it',()=>{reopen('pJournal','bJournal',fillJournal)},true],['Continue',()=>{}]]);
+  buildWorldMarks();renderQuest();
+}
+function checkQuest(r,T){const q=QUESTS[W.q];if(!q||toastOpen())return;const st=T[1];const prog=$('qProg');
+  if(q.brain&&r.brain!==q.brain){if(prog)prog.textContent='Equip '+BRAINS[q.brain].n+' first.';return}
+  if(q.where&&W.last!==q.where)return;
+  if(q.done){if(q.done({state:st}))completeQuest();return}
+  if(q.goal){const g=W.world.landmarks[q.goal];const d=Math.hypot(T[9]-g[0],T[10]-g[1]);if(prog)prog.textContent=d.toFixed(1)+' m to the ring';if(d<1.4&&(st===4||st===5))completeQuest();return}
+  if(q.custom==='shove'){const since=(performance.now()-W.shoveAt)/1000;
+    if(W.shoveAt&&since<6){if(st>=8){if(prog)prog.textContent='It went down. Try a gentler shove.';W.shoveAt=0}else if(since>3){W.shoveAt=0;completeQuest()}else if(prog)prog.textContent='Holding… '+since.toFixed(1)+' s'}
+    else if(prog)prog.textContent='Waiting for a shove.';return}
+  if(q.custom==='fall'){if(st===9||st===10){if(!r.guardianSeen){r.guardianSeen=performance.now();if(prog)prog.textContent='The supervisor caught it.'}else if(performance.now()-r.guardianSeen>2500)completeQuest()}return}
+  if(q.custom==='end'){if(W.pages.length>=QUESTS.length-1&&!$('pJournal').hidden)completeQuest();else if(prog)prog.textContent='Open the journal.';return}
+}
+function clearWorldMarks(){if(!G)return;(G.marks||[]).forEach(m=>{G.scene.remove(m.obj);m.label&&m.label.remove()});G.marks=[]}
+function buildWorldMarks(){if(!G||mode!=='world')return;clearWorldMarks();const q=QUESTS[W.q];
+  const add=(x,y,name,goal)=>{const z=groundAt(x,y);const grp=new THREE.Group();const col=new THREE.Color(goal?0xe2b23c:0xf3efe6);
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(goal?1.1:.35,.035,8,64),new THREE.MeshBasicMaterial({color:col}));ring.position.set(x,y,z+.03);grp.add(ring);
+    const pil=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,goal?3:1.8,8),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.7}));pil.rotation.x=Math.PI/2;pil.position.set(x,y,z+(goal?1.5:.9));grp.add(pil);
+    G.scene.add(grp);const label=document.createElement('div');label.className='label3d beacon'+(goal?' goal':'');label.textContent=name;$('labels').append(label);G.marks.push({obj:grp,label,p:new THREE.Vector3(x,y,z+(goal?3.1:1.9))})};
+  BEACONS.forEach(b=>{if(W.beacons.includes(b.k))add(b.p[0]-.7,b.p[1]+1.2,b.n,false)});
+  if(q&&q.goal&&W.last===q.where){const g=W.world.landmarks[q.goal];add(g[0],g[1],q.t,true)}}
+
+/* ================= the loop ================= */
+let lastT=performance.now(),rate=1;
+function frame(now){
+  requestAnimationFrame(frame);pollPad();
+  const real=Math.max(1e-3,(now-lastT)/1000),wall=Math.min(.25,real);lastT=now;const live=robots.filter(r=>!r.done);
+  if(live.length&&!toastOpen()&&!document.hidden&&$('gen').hidden){
+    const want=Math.round(wall/.002);let ran=0;const t0=performance.now();
+    while(ran<want&&performance.now()-t0<(LOWMEM?12:20)){const k=Math.min(10,want-ran),dt=k*.002;
+      ramp.v+=Math.max(-.5*dt,Math.min(.5*dt,cmd.v-ramp.v));ramp.vy+=Math.max(-.5*dt,Math.min(.5*dt,cmd.vy-ramp.vy));ramp.w+=Math.max(-dt,Math.min(dt,cmd.w-ramp.w));
+      for(const r of live){if(r.done)continue;M._fia_select(r.id);if(M._fia_step(k,ramp.v,ramp.vy,ramp.w,cmd.gait,1,0)<0){r.done='error';toast('Simulation error',M.ccall('fia_error','string',[],[]))}}
+      ran+=k;sampleAll(dt)}
+    rate=.92*rate+.08*(ran*.002/real);
+  }
+  draw();
+}
+function sampleAll(dt){
+  for(const r of robots){if(r.done)continue;const T=tel(r.id),t=T[0],st=T[1],yaw=yawOf(T);
+    const vf=T[6]*Math.cos(yaw)+T[7]*Math.sin(yaw),ve=T[3]*Math.cos(yaw)+T[4]*Math.sin(yaw);
+    if(st===5&&Math.abs(ramp.v-cmd.v)<1e-6&&Math.abs(ramp.w-cmd.w)<1e-6&&Math.abs(ramp.vy-cmd.vy)<1e-6){r.se+=(vf-ramp.v)**2;r.sw+=(T[14]-ramp.w)**2;r.n++}
+    r.us=r.us?.95*r.us+.05*T[85]:T[85];if(t>2)W.cost[r.brain]=r.us;
+    r.hist.push([t,ramp.v,vf,ve]);while(r.hist[0][0]<t-8)r.hist.shift();
+    r.gait.push([t,[25,26,27,28].map(i=>T[i]),[21,22,23,24].map(i=>T[i])]);while(r.gait[0][0]<t-3)r.gait.shift();
+    const kn=[2,5,8,11].reduce((a,j)=>a+T[61+j]**2,0)/4;r.knee.push([t,kn]);while(r.knee[0][0]<t-10)r.knee.shift();
+    let stance=0,cone=0;for(let l=0;l<4;l++){if(T[21+l]>.5){stance++;if(T[29+l]>.5)cone++}if(T[21+l]>.5&&!r.lastContact[l]&&st===5)W.steps++;r.lastContact[l]=T[21+l]>.5}
+    r.grip.push([t,stance?cone/stance:0]);while(r.grip[0][0]<t-3)r.grip.shift();
+    if(st===5)W.odo+=Math.hypot(T[6],T[7])*dt;
+    if(mode==='world'){
+      const gi=Math.floor(T[9]+32),gj=Math.floor(T[10]+32);for(let a=-6;a<=6;a++)for(let b=-6;b<=6;b++){if(a*a+b*b>36)continue;const i=gi+a,j=gj+b;if(i>=0&&i<64&&j>=0&&j<64)W.visited[j*64+i]=1}
+      for(const [n,p,rad] of REGIONS)if(!W.regions.includes(n)&&Math.hypot(T[9]-p[0],T[10]-p[1])<rad){W.regions.push(n);saveW();banner('Found',n)}
+      checkQuest(r,T)}
+    if((st===9||st===10||st===12)&&!r.fellAt)r.fellAt=t;
+    if(r.fellAt&&st===5)r.fellAt=0;
+    if(r.fellAt&&t-r.fellAt>2.5){r.done=st===12?'power cut':'fell'}
+    if(mode==='world'){if(Math.abs(T[9])>30.5||Math.abs(T[10])>30.5)r.done='reached the edge'}
+    else{const c=tileCenter(tileOf(cur.spot.x,cur.spot.y));if(Math.abs(T[9]-c[0])>7.6||Math.abs(T[10]-c[1])>7.6)r.done='reached the edge'}
+  }
+  if(!robots.length||toastOpen())return;
+  if(cur.relay){const r=robots[0];if(!r.done&&r.hist.length&&r.hist[r.hist.length-1][0]>18&&cur.relay.idx===0)r.done='turn over';
+    if(r.done&&cur.relay.idx===0){nextRelay();return}}
+  if(robots.every(r=>r.done)){
+    const w=robots[0].done;
+    if(mode==='world'){
+      const B=BEACONS.find(b=>b.k===W.last);
+      if(w==='fell'||w==='power cut'){W.falls++;saveW();const q=QUESTS[W.q];if(q&&q.custom==='fall'&&W.last===q.where){completeQuest();return}
+        toast(w==='fell'?'Down':'Power cut',(w==='fell'?'The supervisor set Fiammetta down with its motors soft.':'The supervisor cut motor power.')+' Walk over and help it up?',[['Right it here',rightHere,true],['Carry it to '+B.n,respawn]])}
+      else toast('The edge of the valley','The mountains close the valley here.',[['Carry it back a little',()=>rightHere(3)],['Carry it to '+B.n,respawn,true]]);
+      return}
+    if(robots.length===1&&!cur.relay)toast('',w==='fell'?'It fell, and the supervisor set it down with the motors soft.':w==='power cut'?'The supervisor cut motor power.':'It reached the edge of this patch of ground.',
+      w==='fell'||w==='power cut'?[['Right it here',rightHere,true],['Start again',start]]:[['Carry it back a little',()=>rightHere(3),true],['Start again',start]]);
+    else toast('','Both runs have ended. The scores stay on the panel.');
+  }
+}
+
+/* ================= 3D ================= */
+// Natural colours of the valley's materials: grass, trail, rock, stone, bark, forest floor, column.
+const MATCOL=[[.40,.52,.27],[.58,.49,.35],[.50,.49,.46],[.64,.61,.55],[.33,.25,.18],[.30,.40,.22],[.66,.63,.57]];
+function initGL(){
+  const canvas=$('gl');const R=new THREE.WebGLRenderer({canvas,antialias:!LOWMEM,alpha:true});R.setPixelRatio(Math.min(devicePixelRatio,LOWMEM?1.5:2));
+  const scene=new THREE.Scene();const cam=new THREE.PerspectiveCamera(42,1,.05,400);cam.up.set(0,0,1);
+  const ctl=new THREE.OrbitControls(cam,canvas);ctl.enableDamping=true;ctl.maxPolarAngle=1.48;ctl.minDistance=.8;ctl.maxDistance=16;ctl.enablePan=false;
+  const hemi=new THREE.HemisphereLight(0xffffff,0x5d6266,.65);scene.add(hemi);const sun=new THREE.DirectionalLight(0xffffff,.95);sun.position.set(-3,-5,9);scene.add(sun);scene.add(sun.target);
+  if(!LOWMEM){R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);const sc=sun.shadow.camera;sc.left=sc.bottom=-3.5;sc.right=sc.top=3.5;sc.near=1;sc.far=40;sun.shadow.bias=-.0005}
+  const env=document.createElement('canvas');env.width=256;env.height=128;const eg=env.getContext('2d');const gr=eg.createLinearGradient(0,0,0,128);
+  gr.addColorStop(0,'#ffffff');gr.addColorStop(.45,'#c9ced2');gr.addColorStop(.55,'#7d8488');gr.addColorStop(1,'#3b4044');eg.fillStyle=gr;eg.fillRect(0,0,256,128);
+  eg.fillStyle='rgba(255,255,255,.9)';eg.fillRect(40,18,60,14);eg.fillRect(160,22,50,10);
+  const et=new THREE.CanvasTexture(env);et.mapping=THREE.EquirectangularReflectionMapping;const pm=new THREE.PMREMGenerator(R);scene.environment=pm.fromEquirectangular(et).texture;
+  // The valley's sky: a gradient dome, used only in the open world.
+  const sky=document.createElement('canvas');sky.width=4;sky.height=256;const sg=sky.getContext('2d');const sgr=sg.createLinearGradient(0,0,0,256);
+  sgr.addColorStop(0,'#5d8fc2');sgr.addColorStop(.45,'#a9c6dc');sgr.addColorStop(.52,'#dfe6e0');sgr.addColorStop(1,'#9fae8f');sg.fillStyle=sgr;sg.fillRect(0,0,4,256);
+  const skyTex=new THREE.CanvasTexture(sky);
+  const dome=new THREE.Mesh(new THREE.SphereGeometry(180,32,16),new THREE.MeshBasicMaterial({map:skyTex,side:THREE.BackSide,fog:false,depthWrite:false}));dome.rotation.x=Math.PI/2;dome.visible=false;scene.add(dome);
+  G={R,scene,cam,ctl,sun,hemi,dome,terrain:null,coarse:null,parts:null,robots:[],marks:[],ray:new THREE.Raycaster(),drag:null,win:null,decor:null,grass:null};
+  const resize=()=>{const r=canvas.getBoundingClientRect();if(!r.width)return;R.setSize(r.width,r.height,false);cam.aspect=r.width/r.height;cam.updateProjectionMatrix();
+    const s=$('strip');s.width=Math.round(s.clientWidth*devicePixelRatio);s.height=Math.round(s.clientHeight*devicePixelRatio);setJoy()};
+  new ResizeObserver(resize).observe($('stage'));resize();
+  const ndc=e=>{const r=canvas.getBoundingClientRect();return new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1)};
+  canvas.addEventListener('pointerdown',e=>{if(placing){placeDown(e,ndc(e));e.stopImmediatePropagation();return}},true);
+  canvas.addEventListener('pointermove',e=>{if(placing&&placing.down)placeMove(ndc(e))});
+  canvas.addEventListener('pointerdown',e=>{if(e.isPrimary===false||placing)return;G.ray.setFromCamera(ndc(e),cam);
+    for(const rb of G.robots){if(G.ray.intersectObjects(rb.group.children,false).length){const T=tel(rb.id);
+      G.drag={rb,z:T[11],end:null,pid:e.pointerId};ctl.enabled=false;if(mode==='story')showHint('');e.stopImmediatePropagation();return}}},true);
+  canvas.addEventListener('pointermove',e=>{if(!G.drag||e.pointerId!==G.drag.pid)return;G.ray.setFromCamera(ndc(e),cam);const p=new THREE.Vector3();if(G.ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,0,1),-G.drag.z),p))G.drag.end=p});
+  const release=()=>{if(placing&&placing.down){placeUp();return}if(!G||!G.drag)return;const d=G.drag;G.drag=null;ctl.enabled=true;G.shove.visible=false;if(!d.end)return;
+    const T=tel(d.rb.id),v=d.end.clone().sub(new THREE.Vector3(T[9],T[10],T[11]));v.z=0;const f=Math.min(700,v.length()*600);if(f<40)return;v.normalize().multiplyScalar(f);
+    M._fia_select(d.rb.id);M._fia_push(v.x,v.y,0,.1);W.shoveAt=performance.now()};
+  addEventListener('pointerup',release);addEventListener('pointercancel',release);
+  G.shove=new THREE.ArrowHelper(new THREE.Vector3(1,0,0),new THREE.Vector3(),1,0x1a1e22,.12,.08);G.shove.visible=false;scene.add(G.shove);
+  buildParts();useGround('story',true);themeStage();
+}
+function themeStage(){if(!G)return;G.shove.setColor(new THREE.Color(css('--ink')));if(mode==='story')G.scene.fog=new THREE.Fog(new THREE.Color(css('--stage-bot')),14,46);G.win=null;
+  if(robots.length){const T=tel(robots[0].id);buildTerrain(T[9],T[10],true)}buildCoarse()}
+// Which ground is drawn: the evaluation scene for the story, the generated valley for the open world.
+let groundMode=null;
+function useGround(m,force){if(!G||(!force&&m===groundMode))return;groundMode=m;G.hf=m==='world'&&G.hfWorld?G.hfWorld:G.hfStory;G.win=null;
+  const world=m==='world';G.dome.visible=world;
+  if(world){G.scene.fog=new THREE.Fog(0xd5dfdf,22,75);G.hemi.color.set(0xd8e8f4);G.hemi.groundColor.set(0x56603f);G.hemi.intensity=.7;G.sun.color.set(0xfff0d8);G.sun.intensity=1.05}
+  else{G.scene.fog=new THREE.Fog(new THREE.Color(css('--stage-bot')),14,46);G.hemi.color.set(0xffffff);G.hemi.groundColor.set(0x5d6266);G.hemi.intensity=.65;G.sun.color.set(0xffffff);G.sun.intensity=.95}
+  buildCoarse();showDecor(world)}
+function buildParts(){
+  M._fia_select(0);M._fia_terrain_use(0);M.ccall('fia_init','number',INIT_T,['/fia/scene.mjb','',0,-14,-8,2,0,0,1,0,0]);
+  const n=M._fia_ngeom(),parts=[];
+  for(let g=0;g<n;g++){if(M._fia_geom_type(g)!==7)continue;const id=M._fia_geom_dataid(g),nv=M._fia_mesh_nvert(id),nf=M._fia_mesh_nface(id);const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(M.HEAPF32.buffer,M._fia_mesh_vert(id),nv*3).slice(),3));
+    geo.setIndex(new THREE.BufferAttribute(new Uint32Array(new Int32Array(M.HEAP32.buffer,M._fia_mesh_face(id),nf*3)),1));geo.computeVertexNormals();parts.push({g,geo})}
+  G.parts=parts;G.feet=[0,1,2,3].map(l=>M._fia_foot_geom(l));
+  M._fia_step(1,0,0,0,1,0,0);G.hfStory=hfield();G.hf=G.hfStory;  // one step fills the pose buffer the height field's placement is read from
+}
+function hfield(){M._fia_select(0);const nr=M._fia_hfield_nrow(),nc=M._fia_hfield_ncol(),sz=new Float64Array(M.HEAPF64.buffer,M._fia_hfield_size(),4).slice();
+  let hg=0;for(let g=0;g<M._fia_ngeom();g++)if(M._fia_geom_type(g)===1){hg=g;break}const P=poses(0);
+  return {nr,nc,sz,ox:P[12*hg],oy:P[12*hg+1],oz:P[12*hg+2],data:new Float32Array(M.HEAPF32.buffer,M._fia_hfield_data(),nr*nc).slice()}}
+function groundAt(x,y){const h=G.hf;const c=Math.round((x-h.ox+h.sz[0])/(2*h.sz[0])*(h.nc-1)),r=Math.round((y-h.oy+h.sz[1])/(2*h.sz[1])*(h.nr-1));
+  return h.oz+h.data[Math.max(0,Math.min(h.nr-1,r))*h.nc+Math.max(0,Math.min(h.nc-1,c))]*h.sz[2]}
+// Ground under trunks and columns, for drawing: the coarse copy taken before they were added.
+function bareAt(x,y){const C=W.world.coarse;const fx=(x+32)/C.step,fy=(y+32)/C.step;const i=Math.max(0,Math.min(C.n-2,Math.floor(fx))),j=Math.max(0,Math.min(C.n-2,Math.floor(fy)));const u=fx-i,v=fy-j,k=j*C.n+i;
+  return (C.h[k]*(1-u)+C.h[k+1]*u)*(1-v)+(C.h[k+C.n]*(1-u)+C.h[k+C.n+1]*u)*v}
+const metal=()=>new THREE.MeshStandardMaterial({color:0xb7bdc2,metalness:.85,roughness:.32,envMapIntensity:1});
+function buildRobots(){
+  for(const rb of G.robots){G.scene.remove(rb.group);rb.arrows.forEach(a=>G.scene.remove(a));rb.label&&rb.label.remove();rb.ring&&G.scene.remove(rb.ring)}
+  G.robots=[];const compare=cur.brains.length===2;const mat=metal();$('bPlace').hidden=compare;
+  robots.forEach(r=>{const tint=compare?(r.slotLabel===0?css('--b'):css('--flame')):null;
+    const group=new THREE.Group();for(const p of G.parts){const m=new THREE.Mesh(p.geo,mat);m.matrixAutoUpdate=false;m.castShadow=true;m.userData.g=p.g;group.add(m)}G.scene.add(group);
+    const arrows=[0,1,2,3].map(()=>{const a=new THREE.ArrowHelper(new THREE.Vector3(0,0,1),new THREE.Vector3(),.3,0xe0531f,.06,.035);G.scene.add(a);return a});
+    let label=null,ring=null;if(compare){label=document.createElement('div');label.className='label3d';label.style.background=tint;label.textContent=BRAINS[r.brain].n;$('labels').append(label);
+      ring=new THREE.Mesh(new THREE.RingGeometry(.42,.5,48),new THREE.MeshBasicMaterial({color:new THREE.Color(tint),transparent:true,opacity:.8}));G.scene.add(ring)}
+    G.robots.push({id:r.id,group,arrows,label,ring})});
+  const T=tel(robots[0].id),yw=yawOf(T);const side=compare&&!cur.relay?.9:0,far=compare?1.45:1;G.ctl.target.set(T[9],T[10]+side,T[11]);
+  // Behind and to the left of the robot's heading.
+  const bx=Math.cos(yw)*-2.6-Math.sin(yw)*-1.6,by=Math.sin(yw)*-2.6+Math.cos(yw)*-1.6;G.cam.position.set(T[9]+bx*far,T[10]+side+by*far,T[11]+1.3*far);
+}
+function terrainMesh(cx,cy,half,stride,coarse){
+  const h=G.hf,dx=2*h.sz[0]/(h.nc-1),dy=2*h.sz[1]/(h.nr-1),world=groundMode==='world'&&W.world;
+  const c0=Math.max(0,Math.round((cx-half-h.ox+h.sz[0])/dx)),c1=Math.min(h.nc-1,Math.round((cx+half-h.ox+h.sz[0])/dx)),r0=Math.max(0,Math.round((cy-half-h.oy+h.sz[1])/dy)),r1=Math.min(h.nr-1,Math.round((cy+half-h.oy+h.sz[1])/dy));
+  const cols=Math.floor((c1-c0)/stride)+1,rows=Math.floor((r1-r0)/stride)+1,pos=new Float32Array(cols*rows*3),col=new Float32Array(cols*rows*3);
+  const dark=css('--paper').toLowerCase()==='#14171a';const A=new THREE.Color(dark?0x3b4347:0xa9afa6),B=new THREE.Color(dark?0x343b3f:0x9ca298);let k=0;
+  const mat=world?W.world.mat:null,MAT=window.FiaWorld?FiaWorld.MAT:{};
+  for(let i=0;i<rows;i++){const r=r0+i*stride;for(let j=0;j<cols;j++){const c=c0+j*stride,x=h.ox-h.sz[0]+c*dx,y=h.oy-h.sz[1]+r*dy;const kk=r*h.nc+c;
+    let z=h.oz+h.data[kk]*h.sz[2];
+    if(world){const m=mat[kk];if(m===MAT.bark||m===MAT.column)z=bareAt(x,y);if(coarse)z=Math.min(z,bareAt(x,y));
+      const base=MATCOL[m===MAT.bark?MAT.forest:m===MAT.column?MAT.stone:m];const nz=.84+.2*FiaWorld.vnoise(x*.45,y*.45,3)+.08*FiaWorld.vnoise(x*2.2,y*2.2,4)+.05*FiaWorld.hash(Math.floor(x*10),Math.floor(y*10),5);
+      col.set([base[0]*nz,base[1]*nz,base[2]*nz],3*k)}
+    else{const q=coarse?A:(((Math.floor(x)+Math.floor(y))&1)?A:B);col.set([q.r,q.g,q.b],3*k)}
+    pos.set([x,y,z-(coarse?.04:0)],3*k);k++}}
+  const idx=new Uint32Array((rows-1)*(cols-1)*6);k=0;for(let i=0;i<rows-1;i++)for(let j=0;j<cols-1;j++){const a=i*cols+j;idx.set([a,a+1,a+cols+1,a,a+cols+1,a+cols],k);k+=6}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.setIndex(new THREE.BufferAttribute(idx,1));geo.computeVertexNormals();
+  const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,envMapIntensity:.12}));mesh.receiveShadow=!coarse;return mesh;
+}
+function buildCoarse(){if(!G||!G.hf)return;if(G.coarse){G.scene.remove(G.coarse);G.coarse.geometry.dispose()}G.coarse=terrainMesh(0,0,32,LOWMEM?24:12,true);G.scene.add(G.coarse)}
+function buildTerrain(x,y,force){
+  if(!force&&G.win&&Math.hypot(x-G.win[0],y-G.win[1])<4.5)return;
+  if(G.terrain){G.scene.remove(G.terrain);G.terrain.geometry.dispose()}
+  const world=groundMode==='world';G.terrain=terrainMesh(x,y,LOWMEM?8:(world?12:11),world?2:(LOWMEM?2:1),false);G.scene.add(G.terrain);G.win=[x,y];
+  if(world)buildGrass(x,y);
+}
+// Trees, columns and boulders' colour come from the generator's lists; grass is drawn near the robot only.
+function buildDecor(){if(!G)return;if(G.decor){G.scene.remove(G.decor);G.decor.traverse(o=>{o.geometry&&o.geometry.dispose()})}
+  const grp=new THREE.Group();const w=W.world,dummy=new THREE.Object3D();
+  const trunkM=new THREE.MeshStandardMaterial({color:0x5a4330,roughness:.95,envMapIntensity:.2}),crownM=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.9,flatShading:true,envMapIntensity:.2});
+  const trunks=new THREE.InstancedMesh(new THREE.CylinderGeometry(1,1.15,1,7),trunkM,w.trees.length),crowns=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),crownM,w.trees.length*2);
+  trunks.castShadow=crowns.castShadow=!LOWMEM;const cA=new THREE.Color(0x3f5f2a),cB=new THREE.Color(0x5f7d35),cc=new THREE.Color();let ci=0;
+  w.trees.forEach((t,i)=>{const z=bareAt(t.x,t.y);dummy.position.set(t.x,t.y,z+(t.h+.3)/2);dummy.rotation.set(Math.PI/2,0,0);dummy.scale.set(t.r,t.h+.3,t.r);dummy.updateMatrix();trunks.setMatrixAt(i,dummy.matrix);
+    for(let s=0;s<2;s++){const rr=t.crown*(s?.7:1);dummy.position.set(t.x+(s?.25:0),t.y+(s?-.2:0),z+t.h+rr*(s?1.2:.55));dummy.rotation.set(t.x,t.y,0);dummy.scale.set(rr,rr,rr*1.15);dummy.updateMatrix();crowns.setMatrixAt(ci,dummy.matrix);
+      cc.copy(cA).lerp(cB,((t.x*7.3+t.y*3.1+s)%1+1)%1);crowns.setColorAt(ci,cc);ci++}});
+  grp.add(trunks,crowns);
+  const colM=new THREE.MeshStandardMaterial({color:0xb4ab98,roughness:.85,envMapIntensity:.2});const cols=new THREE.InstancedMesh(new THREE.CylinderGeometry(1,1,1,12),colM,w.columns.length);cols.castShadow=!LOWMEM;
+  w.columns.forEach((o,i)=>{const z=o.z;dummy.position.set(o.x,o.y,z+o.h/2);dummy.rotation.set(Math.PI/2,0,0);dummy.scale.set(o.r,o.h,o.r);dummy.updateMatrix();cols.setMatrixAt(i,dummy.matrix)});grp.add(cols);
+  // Tents at the camp: what the place is called after.
+  const tentM=new THREE.MeshStandardMaterial({color:0xc8643a,roughness:.8,side:THREE.DoubleSide,envMapIntensity:.2});const L=w.landmarks;
+  [[-23,-15,.6],[-22.5,-9,-.4],[-18.5,-16.4,1.1]].forEach(([x,y,a])=>{const t=new THREE.Mesh(new THREE.ConeGeometry(1.1,1.3,4,1,true),tentM);t.position.set(x,y,bareAt(x,y)+.65);t.rotation.set(Math.PI/2,a,0);t.castShadow=!LOWMEM;grp.add(t)});
+  G.decor=grp;grp.visible=groundMode==='world';G.scene.add(grp);
+}
+function showDecor(on){if(!G)return;if(G.decor)G.decor.visible=on;if(G.grass)G.grass.visible=on;if(G.dome)G.dome.visible=on}
+function buildGrass(cx,cy){if(G.grass){G.scene.remove(G.grass);G.grass.geometry.dispose()}
+  const N=LOWMEM?1600:5000,blade=new THREE.BufferGeometry();const v=[];for(let b=0;b<5;b++){const a=b*1.26,ox=Math.cos(a)*.03,oy=Math.sin(a)*.03,s=Math.cos(a+1.6)*.008,c=Math.sin(a+1.6)*.008;v.push(ox-s,oy-c,0, ox+s,oy+c,0, ox*2.2+(b%2?.02:-.02),oy*2.2,1)}
+  blade.setAttribute('position',new THREE.Float32BufferAttribute(v,3));blade.computeVertexNormals();
+  const mesh=new THREE.InstancedMesh(blade,new THREE.MeshStandardMaterial({color:0x86a24c,roughness:1,side:THREE.DoubleSide,envMapIntensity:.15}),N);
+  const dummy=new THREE.Object3D(),MAT=FiaWorld.MAT,h=G.hf;let n=0;
+  for(let t=0;t<N*3&&n<N;t++){const r=Math.sqrt(Math.random())*11,a=Math.random()*6.283;const x=cx+r*Math.cos(a),y=cy+r*Math.sin(a);
+    const c=Math.round((x-h.ox+h.sz[0])/(2*h.sz[0])*(h.nc-1)),rr=Math.round((y-h.oy+h.sz[1])/(2*h.sz[1])*(h.nr-1));if(c<0||rr<0||c>=h.nc||rr>=h.nr)continue;
+    const m=W.world.mat[rr*h.nc+c];if(m!==MAT.grass&&m!==MAT.forest)continue;
+    dummy.position.set(x,y,groundAt(x,y)-.01);dummy.rotation.set(0,0,a);const s=.08+Math.random()*.12;dummy.scale.set(1,1,s);dummy.updateMatrix();mesh.setMatrixAt(n++,dummy.matrix)}
+  mesh.count=n;G.grass=mesh;G.scene.add(mesh)}
+const m4=new THREE.Matrix4(),tmp=new THREE.Vector3();
+function placeLabel(el,p){tmp.copy(p).project(G.cam);const r=$('gl').getBoundingClientRect();el.style.left=((tmp.x+1)/2*r.width)+'px';el.style.top=((1-tmp.y)/2*r.height)+'px';el.hidden=tmp.z>1||Math.abs(tmp.x)>1.1||Math.abs(tmp.y)>1.1}
+function draw(){
+  if(!G||!robots.length||!G.robots.length)return;let cx=0,cy=0,cz=0;
+  G.robots.forEach(rb=>{const P=poses(rb.id),T=tel(rb.id);
+    for(const m of rb.group.children){const o=12*m.userData.g;m4.set(P[o+3],P[o+4],P[o+5],P[o],P[o+6],P[o+7],P[o+8],P[o+1],P[o+9],P[o+10],P[o+11],P[o+2],0,0,0,1);m.matrix.copy(m4)}
+    G.feet.forEach((g,l)=>{const a=rb.arrows[l];tmp.set(T[49+3*l],T[50+3*l],T[51+3*l]);const n=tmp.length();a.visible=n>8&&T[21+l]>.5;if(!a.visible)return;
+      a.position.set(P[12*g],P[12*g+1],P[12*g+2]-.02);a.setDirection(tmp.normalize());a.setLength(Math.min(.6,n/450),.05,.03);a.setColor(T[29+l]>.5?0xd89a2a:0xe0531f)});
+    cx+=T[9];cy+=T[10];cz+=T[11];
+    if(rb.ring)rb.ring.position.set(T[9],T[10],groundAt(T[9],T[10])+.015);
+    rb.at=new THREE.Vector3(T[9],T[10],T[11]+.45)});
+  const n=G.robots.length;tmp.set(cx/n,cy/n,cz/n).sub(G.ctl.target).multiplyScalar(.07);G.ctl.target.add(tmp);G.cam.position.add(tmp);
+  G.sun.position.set(cx/n-3,cy/n-5,cz/n+9);G.sun.target.position.set(cx/n,cy/n,cz/n);G.dome.position.set(cx/n,cy/n,0);
+  buildTerrain(cx/n,cy/n,false);
+  if(G.drag&&G.drag.end){const T=tel(G.drag.rb.id),o=new THREE.Vector3(T[9],T[10],T[11]),v=G.drag.end.clone().sub(o);v.z=0;const L=v.length();
+    if(L>.05){G.shove.position.copy(o);G.shove.setDirection(v.normalize());G.shove.setLength(Math.min(1.2,L),.12,.08);G.shove.visible=true}}
+  captureStandPose();if(placing)drawGhost();
+  G.ctl.update();G.R.render(G.scene,G.cam);
+  for(const rb of G.robots)if(rb.label&&rb.at)placeLabel(rb.label,rb.at);
+  for(const m of G.marks)placeLabel(m.label,m.p);
+  const T0=tel(robots[robots.length-1].id),s=STATE_TEXT[T0[1]]||['—','warn'];$('cState').textContent=s[0];$('cDot').className='dot '+s[1];
+  const f=STATE_FSM[T0[1]]||null;if(f!==lastFsm){lastFsm=f;drawFsm(f)}
+  $('cRate').textContent=Math.round(Math.min(rate,1)*100)+' % of real time';
+  if(mode==='world')renderSheet();else{renderTally();drawStrip()}
+}
+let tallyKey='';
+function renderTally(){const el=$('tally');const compare=cur.brains.length===2;el.hidden=!loaded||mode!=='story'||!robots.length;if(el.hidden)return;
+  const rows=compare?cur.brains.map((b,i)=>cur.relay?(i===robots[0].slotLabel?robots[0]:cur.relay.results[i]||{brain:b,pending:true}):robots[i]):robots;
+  const key=rows.map(r=>r&&r.brain+(r.pending?'p':'')).join()+(cur.relay?cur.relay.idx:'');
+  if(key!==tallyKey){tallyKey=key;el.innerHTML=rows.map((r,i)=>`<div class="row"><i class="sw" style="background:${compare&&i===0?css('--b'):css('--flame')}"></i><div><div>${BRAINS[r.brain].n}</div><div class="vals" id="tv${i}">—</div></div></div>`).join('')}
+  rows.forEach((r,i)=>{const e=$('tv'+i);if(!e||!r)return;if(r.pending){e.textContent='runs next, on the same course';return}
+    const sp=r.n>50?Math.sqrt(r.se/r.n).toFixed(2):'…',tw=r.n>50?Math.sqrt(r.sw/r.n).toFixed(2):'…';
+    e.textContent=`speed error ${sp} m/s · turn error ${tw} rad/s · ${(r.us/1000).toFixed(2)} ms per cycle${r.done&&r.done!=='turn over'?' · '+r.done:''}`})}
+function renderSheet(){const r=robots[0];if(!r)return;const el=$('sheet');
+  const kneeRms=r.knee.length?Math.sqrt(r.knee.reduce((a,b)=>a+b[1],0)/r.knee.length):0;const grip=r.grip.length?r.grip.reduce((a,b)=>a+b[1],0)/r.grip.length:0;
+  if(!el.dataset.built){el.innerHTML=`<div class="r"><div><b id="shB"></b></div></div>
+    <div class="r"><div><span>Knee load</span><em id="shK"></em></div><div class="gauge" title="RMS over 10 s. The mark is the 20 N·m continuous rating; the bar ends at the 60 N·m peak."><i id="shKg"></i></div></div>
+    <div class="r"><div><span>Feet out of grip</span><em id="shG"></em></div></div>
+    <div class="r"><div><span>Walked</span><em id="shO"></em></div><div><span>Steps</span><em id="shS"></em></div><div><span>Falls</span><em id="shF"></em></div></div>`;el.dataset.built=1;
+    el.onclick=()=>el.classList.toggle('collapsed');if(innerWidth<=980)el.classList.add('collapsed')}
+  $('shB').textContent=BRAINS[r.brain].n;$('shK').textContent=kneeRms.toFixed(1)+' N·m';$('shKg').style.width=Math.min(100,kneeRms/60*100)+'%';$('shKg').style.background=kneeRms>20?'var(--warn)':'var(--ok)';
+  $('shG').textContent=Math.round(grip*100)+' %';$('shO').textContent=W.odo.toFixed(1)+' m';$('shS').textContent=W.steps;$('shF').textContent=W.falls}
+function drawStrip(){const c=$('strip');if(c.hidden||!c.width||mode!=='story')return;const g=c.getContext('2d'),w=c.width,h=c.height,dpr=devicePixelRatio;g.clearRect(0,0,w,h);
+  const r=robots[robots.length-1];if(!r||r.hist.length<2||r.gait.length<2)return;
+  g.fillStyle=css('--chip');g.globalAlpha=.85;g.beginPath();g.roundRect?g.roundRect(0,0,w,h,10*dpr):g.rect(0,0,w,h);g.fill();g.globalAlpha=1;
+  const pad=8*dpr,gw=w*.4,t1=r.gait[r.gait.length-1][0],lh=(h-2*pad)/4;g.font=`${9*dpr}px JetBrains Mono, monospace`;
+  for(let k=1;k<r.gait.length;k++){const p=r.gait[k],q=r.gait[k-1],xa=pad+24*dpr+(q[0]-(t1-3))/3*(gw-24*dpr),xb=pad+24*dpr+(p[0]-(t1-3))/3*(gw-24*dpr);
+    for(let l=0;l<4;l++){if(p[1][l]){g.fillStyle=css('--rule');g.fillRect(xa,pad+l*lh+1,xb-xa+1,lh-2)}if(p[2][l]){g.fillStyle=css('--ink');g.fillRect(xa,pad+l*lh+lh/2-1.5*dpr,xb-xa+1,3*dpr)}}}
+  g.fillStyle=css('--ink-2');['FL','FR','RL','RR'].forEach((nm,l)=>g.fillText(nm,pad,pad+l*lh+lh/2+3*dpr));
+  const X0=gw+pad*3,Wd=w-X0-pad,tt=r.hist[r.hist.length-1][0],x=t=>X0+(t-(tt-8))/8*Wd,y=v=>h-pad-(v+.5)/1.7*(h-2*pad-10*dpr);
+  g.strokeStyle=css('--rule');g.lineWidth=dpr;g.beginPath();g.moveTo(X0,y(0));g.lineTo(X0+Wd,y(0));g.stroke();
+  [[1,'--ink-3',1,[4,3]],[2,'--flame',2,[]],[3,'--b',1.4,[]]].forEach(([i,c2,lw,da])=>{g.strokeStyle=css(c2);g.lineWidth=lw*dpr;g.setLineDash(da.map(d=>d*dpr));g.beginPath();r.hist.forEach((p,k)=>k?g.lineTo(x(p[0]),y(p[i])):g.moveTo(x(p[0]),y(p[i])));g.stroke()});g.setLineDash([]);
+  g.fillStyle=css('--ink-2');g.fillText('speed: asked · true · estimated',X0,pad+4*dpr);
+}
+
+/* ================= the operator ================= */
+// Lifting the robot, carrying it and setting it down, as a person at the robot would. The controller is
+// restarted where it is set down, as it is after the robot has been handled: it sits, finds its
+// bearings and stands up again, so the estimator never sees the robot jump.
+let placing=null;
+const trunkMatrix=T=>new THREE.Matrix4().compose(new THREE.Vector3(T[9],T[10],T[11]),new THREE.Quaternion(T[16],T[17],T[18],T[15]),new THREE.Vector3(1,1,1));
+function captureStandPose(){if(G.standPose||!robots.length||!G.robots.length)return;const T=tel(robots[0].id);if(T[1]!==4&&!(T[1]===5&&T[0]>4))return;
+  const inv=trunkMatrix(T).invert();G.standPose={rel:G.robots[0].group.children.map(m=>inv.clone().multiply(m.matrix)),height:T[11]-groundAt(T[9],T[10])}}
+function groundSpan(x,y){let lo=1e9,hi=-1e9;for(let a=0;a<12;a++){for(const r of [.15,.3,.45]){const z=groundAt(x+r*Math.cos(a*.5236),y+r*Math.sin(a*.5236));lo=Math.min(lo,z);hi=Math.max(hi,z)}}return hi-lo}
+function inBounds(x,y){if(mode==='world')return Math.abs(x)<29.5&&Math.abs(y)<29.5;const c=tileCenter(tileOf(cur.spot.x,cur.spot.y));return Math.abs(x-c[0])<7&&Math.abs(y-c[1])<7}
+// The nearest spot within reach that is level enough for the robot to sit and stand on.
+function findSpot(x,y){for(let r=0;r<=2.4;r+=.2)for(let a=0;a<(r?Math.ceil(r*12):1);a++){const px=x+r*Math.cos(a/(r*12||1)*6.283),py=y+r*Math.sin(a/(r*12||1)*6.283);
+  if(inBounds(px,py)&&groundSpan(px,py)<.12)return [px,py]}return null}
+function enterPlace(){if(!loaded||!robots.length||cur.brains.length>1)return;hideToast();closePanels();const T=tel(robots[0].id);
+  placing={x:T[9],y:T[10],yaw:yawOf(T),down:false};G.ctl.enabled=false;$('stage').classList.add('placing');$('placebar').hidden=false;$('bPlace').setAttribute('aria-pressed','true');
+  if(!G.ghost){const mat=new THREE.MeshBasicMaterial({color:0xe0531f,transparent:true,opacity:.35,depthWrite:false});G.ghost=new THREE.Group();for(const p of G.parts){const m=new THREE.Mesh(p.geo,mat);m.matrixAutoUpdate=false;G.ghost.add(m)}G.scene.add(G.ghost)}
+  G.ghost.visible=true}
+function exitPlace(){placing=null;if(G){G.ctl.enabled=true;if(G.ghost)G.ghost.visible=false}$('stage').classList.remove('placing');$('placebar').hidden=true;$('bPlace').setAttribute('aria-pressed','false')}
+function groundHit(v){G.ray.setFromCamera(v,G.cam);const hits=G.ray.intersectObjects([G.terrain,G.coarse].filter(Boolean),false);return hits[0]?hits[0].point:null}
+function placeDown(e,v){const p=groundHit(v);if(!p)return;placing.x=p.x;placing.y=p.y;placing.down=true;placing.pid=e.pointerId}
+function placeMove(v){const p=groundHit(v);if(!p)return;const dx=p.x-placing.x,dy=p.y-placing.y;if(Math.hypot(dx,dy)>.25)placing.yaw=Math.atan2(dy,dx)}
+function placeUp(){const p=placing;p.down=false;setDown(p.x,p.y,p.yaw)}
+function drawGhost(){if(!G.ghost)return;const p=placing;let sp=G.standPose;
+  if(!sp&&robots.length&&G.robots.length){const T=tel(robots[0].id),inv=trunkMatrix(T).invert();sp={rel:G.robots[0].group.children.map(m=>inv.clone().multiply(m.matrix)),height:Math.max(.3,T[11]-groundAt(T[9],T[10]))}}const h=sp?sp.height:.36;const ok=inBounds(p.x,p.y)&&groundSpan(p.x,p.y)<.12;
+  G.ghost.children[0].material.color.set(ok?0xe0531f:0x9a9a9a);
+  const base=new THREE.Matrix4().compose(new THREE.Vector3(p.x,p.y,groundAt(p.x,p.y)+h),new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),p.yaw),new THREE.Vector3(1,1,1));
+  G.ghost.children.forEach((m,i)=>{if(sp)m.matrix.copy(base).multiply(sp.rel[i]);else m.matrix.copy(base)})}
+function setDown(x,y,yaw){const spot=findSpot(x,y);
+  if(!spot){exitPlace();toast('Too rough here','There is no level ground within reach of that spot. Try somewhere flatter.',[['Pick it up again',enterPlace,true],['Leave it',()=>{}]]);return}
+  exitPlace();const brain=robots[0]?robots[0].brain:cur.brains[0];
+  for(let id=0;id<3;id++){M._fia_select(id);M._fia_free()}M._fia_terrain_use(mode==='world'?1:0);
+  const r=initSession(0,brain,spot[0],spot[1],mode==='world'||!!cur.spot.slope,yaw);if(!r)return;r.slotLabel=0;robots=[r];cur.relay=null;
+  cmd.v=cmd.vy=cmd.w=0;ramp.v=ramp.vy=ramp.w=0;setJoy();buildTerrain(spot[0],spot[1],true);buildRobots();tallyKey='';
+  if(mode==='world'){buildWorldMarks();banner('Set down','The controller starts again')}else showHint('Set down. The controller starts again.')}
+function rightHere(back){const T=tel(robots[0].id);let x=T[9],y=T[10];const yaw=yawOf(T);
+  if(back){const c=mode==='world'?[0,0]:tileCenter(tileOf(cur.spot.x,cur.spot.y));const d=Math.hypot(c[0]-x,c[1]-y)||1;x+=(c[0]-x)/d*back;y+=(c[1]-y)/d*back}
+  setDown(x,y,back?Math.atan2((mode==='world'?0:tileCenter(tileOf(cur.spot.x,cur.spot.y))[1])-y,(mode==='world'?0:tileCenter(tileOf(cur.spot.x,cur.spot.y))[0])-x):yaw)}
+$('bPlace').onclick=()=>{placing?exitPlace():enterPlace()};
+$('pCancel').onclick=exitPlace;
+$('pHere').onclick=()=>{const T=tel(robots[0].id);exitPlace();setDown(T[9],T[10],yawOf(T))};
+addEventListener('keydown',e=>{if(e.key==='Escape'&&placing)exitPlace()});
+</script>
+
+</body>
+</html>
